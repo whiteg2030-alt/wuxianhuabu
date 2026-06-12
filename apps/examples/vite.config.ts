@@ -52,6 +52,13 @@ const DEFAULT_IMAGE_MODEL = 'gpt-image-2'
 const TEXT_MODEL_IDS = new Set(['gpt-5.5', 'deepseek-chat', 'deepseek-reasoner'])
 const IMAGE_MODEL_IDS = new Set(['gpt-image-2', 'nanobanana', 'nanobanana-pro', 'nanobanana-2'])
 
+const ARK_DEFAULT_BASE_URL = 'https://ark.cn-beijing.volces.com/api/v3'
+const DEFAULT_VIDEO_MODEL = 'doubao-seedance-2-0-260128'
+const VIDEO_MODEL_IDS = new Set(['doubao-seedance-2-0-260128', 'doubao-seedance-2-0-fast-260128'])
+const VIDEO_RESOLUTIONS = new Set(['480p', '720p', '1080p'])
+const VIDEO_RATIOS = new Set(['adaptive', '16:9', '9:16', '1:1', '4:3', '3:4', '21:9'])
+const VIDEO_IMAGE_ROLES = new Set(['first_frame', 'last_frame', 'reference_image'])
+
 // eslint-disable-next-line no-console
 console.log('build env:', env)
 
@@ -239,6 +246,7 @@ function aiStudioApiPlugin(): Plugin {
 					configured: Boolean(getAiApiKey()),
 					baseUrl: getAiBaseUrl(),
 					imageApiUrl: getImageApiUrl(),
+					arkConfigured: Boolean(getArkApiKey()),
 				})
 			})
 
@@ -295,6 +303,36 @@ function aiStudioApiPlugin(): Plugin {
 						configured: true,
 						baseUrl: getAiBaseUrl(),
 					})
+				} catch (err) {
+					sendJson(res, 500, { error: getErrorMessage(err) })
+				}
+			})
+
+			server.middlewares.use('/api/ark-key', async (req, res) => {
+				if (req.method !== 'POST') {
+					sendJson(res, 405, { error: 'Method not allowed' })
+					return
+				}
+
+				try {
+					const body = await readJsonBody(req)
+					const arkApiKey = getString(body.arkApiKey).trim()
+					const existingArkApiKey = getArkApiKey() || ''
+					const nextArkApiKey = arkApiKey || existingArkApiKey
+					const arkBaseUrl = getString(body.arkBaseUrl).trim()
+					const normalizedArkBaseUrl = normalizeAiBaseUrl(arkBaseUrl)
+
+					if (!nextArkApiKey || !isValidAiApiKey(nextArkApiKey)) {
+						sendJson(res, 400, { error: '请输入有效的火山引擎 ARK API Key。' })
+						return
+					}
+					if (arkBaseUrl && !normalizedArkBaseUrl) {
+						sendJson(res, 400, { error: '请输入有效的火山方舟接口地址。' })
+						return
+					}
+
+					saveArkSettings(nextArkApiKey, normalizedArkBaseUrl)
+					sendJson(res, 200, { arkConfigured: true, arkBaseUrl: getArkBaseUrl() })
 				} catch (err) {
 					sendJson(res, 500, { error: getErrorMessage(err) })
 				}
@@ -911,6 +949,47 @@ function saveAiSettings(apiKey: string, baseUrl: string) {
 		process.env.IMAGE_GATEWAY_BASE_URL = baseUrl
 	} else {
 		delete process.env.IMAGE_GATEWAY_BASE_URL
+	}
+}
+
+function getArkApiKey() {
+	return process.env.ARK_API_KEY
+}
+
+function getArkAuthorizationHeader() {
+	const apiKey = getArkApiKey()?.trim()
+	if (!apiKey) return ''
+	return apiKey.toLowerCase().startsWith('bearer ') ? apiKey : `Bearer ${apiKey}`
+}
+
+function getArkBaseUrl() {
+	return normalizeAiBaseUrl(process.env.ARK_BASE_URL) || ARK_DEFAULT_BASE_URL
+}
+
+function saveArkSettings(apiKey: string, baseUrl: string) {
+	const envPath = path.join(__dirname, '.env.local')
+	const lines = existsSync(envPath) ? readFileSync(envPath, 'utf8').split(/\r?\n/) : []
+	let foundApiKey = false
+	let foundBaseUrl = false
+	const nextLines = lines.flatMap((line) => {
+		if (line.startsWith('ARK_API_KEY=')) {
+			foundApiKey = true
+			return [`ARK_API_KEY=${apiKey}`]
+		}
+		if (line.startsWith('ARK_BASE_URL=')) {
+			foundBaseUrl = true
+			return baseUrl ? [`ARK_BASE_URL=${baseUrl}`] : []
+		}
+		return [line]
+	})
+	if (!foundApiKey) nextLines.push(`ARK_API_KEY=${apiKey}`)
+	if (baseUrl && !foundBaseUrl) nextLines.push(`ARK_BASE_URL=${baseUrl}`)
+	writeFileSync(envPath, `${nextLines.filter((line, index) => line || index < nextLines.length - 1).join('\n')}\n`)
+	process.env.ARK_API_KEY = apiKey
+	if (baseUrl) {
+		process.env.ARK_BASE_URL = baseUrl
+	} else {
+		delete process.env.ARK_BASE_URL
 	}
 }
 
