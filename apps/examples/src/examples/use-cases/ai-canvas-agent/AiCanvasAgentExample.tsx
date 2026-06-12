@@ -1164,6 +1164,23 @@ export default function AiCanvasAgentExample() {
 		createWorkflowPromptFromImage(source, presetId, point)
 	}
 
+	function handleCreateVideoFromMenu() {
+		if (!generationMenu) return
+		const source = nodes.find(
+			(node): node is ImageNode => node.id === generationMenu.fromNodeId && isImageNode(node)
+		)
+		if (!source) {
+			setGenerationMenu(null)
+			return
+		}
+		const point = {
+			x: generationMenu.canvasPoint.x + 28,
+			y: generationMenu.canvasPoint.y - VIDEO_NODE_BASE_HEIGHT / 2,
+		}
+		setGenerationMenu(null)
+		createVideoNodeFromImages([source], point)
+	}
+
 	function createWorkflowPromptFromImage(
 		source: ImageNode,
 		presetId: WorkflowPresetId,
@@ -1271,8 +1288,8 @@ export default function AiCanvasAgentExample() {
 		}
 	}
 
-	function createVideoNodeFromSelection() {
-		const sourceNodes = getSelectedImageNodes().slice(0, MAX_VIDEO_REFERENCE_IMAGES)
+	function createVideoNodeFromImages(sources: ImageNode[], point?: Point) {
+		const sourceNodes = sources.slice(0, MAX_VIDEO_REFERENCE_IMAGES)
 		const mode: VideoGenerationMode =
 			sourceNodes.length === 0
 				? 'text'
@@ -1286,8 +1303,12 @@ export default function AiCanvasAgentExample() {
 		const videoNode: VideoNode = {
 			id: createNodeId('video'),
 			type: 'video',
-			x: anchor ? anchor.x + getNodeSize(anchor).w + NODE_GAP : center.x - VIDEO_NODE_WIDTH / 2,
-			y: anchor ? anchor.y : center.y - VIDEO_NODE_BASE_HEIGHT / 2,
+			x: point
+				? point.x
+				: anchor
+					? anchor.x + getNodeSize(anchor).w + NODE_GAP
+					: center.x - VIDEO_NODE_WIDTH / 2,
+			y: point ? point.y : anchor ? anchor.y : center.y - VIDEO_NODE_BASE_HEIGHT / 2,
 			prompt: '',
 			mode,
 			sourceImageIds: sourceNodes.map((node) => node.id),
@@ -1321,6 +1342,10 @@ export default function AiCanvasAgentExample() {
 				? '已创建文生视频节点，填写提示词后生成'
 				: `已创建「${VIDEO_MODE_LABELS[mode]}」节点，引用 ${sourceNodes.length} 张图片`
 		)
+	}
+
+	function createVideoNodeFromSelection() {
+		createVideoNodeFromImages(getSelectedImageNodes())
 	}
 
 	function createTextNodeAt(point: Point) {
@@ -2304,6 +2329,7 @@ export default function AiCanvasAgentExample() {
 									onReference={sendImageParametersToAgent}
 									onDelete={(targetNode) => deleteNodes([targetNode.id])}
 									onWorkflowPreset={createWorkflowPromptFromImage}
+									onCreateVideo={(targetNode) => createVideoNodeFromImages([targetNode])}
 									onMotionTransfer={createMotionTransferPrompt}
 									onAnnotationChange={(nodeId, paths) =>
 										updateImageNode(nodeId, { annotations: paths })
@@ -2391,12 +2417,16 @@ export default function AiCanvasAgentExample() {
 					className="tap-generate-menu"
 					style={{
 						left: Math.min(generationMenu.screenPoint.x, window.innerWidth - 288),
-						top: Math.min(generationMenu.screenPoint.y, window.innerHeight - 360),
+						top: Math.min(generationMenu.screenPoint.y, window.innerHeight - 420),
 					}}
 				>
 					<button type="button" onClick={handleCreatePromptFromMenu}>
 						<span className="tap-generate-menu__icon">+</span>
 						图片生成
+					</button>
+					<button type="button" onClick={handleCreateVideoFromMenu}>
+						<span className="tap-generate-menu__icon">▶</span>
+						生成视频
 					</button>
 					<div className="tap-generate-menu__presets" aria-label="工作流预设">
 						{WORKFLOW_PRESETS.map((preset) => (
@@ -2866,6 +2896,7 @@ function ImageNodeView({
 	onReference,
 	onDelete,
 	onWorkflowPreset,
+	onCreateVideo,
 	onMotionTransfer,
 	onAnnotationChange,
 	onAnnotationNoteChange,
@@ -2888,6 +2919,7 @@ function ImageNodeView({
 	onReference(nodeId: string): void
 	onDelete(node: ImageNode): void
 	onWorkflowPreset(node: ImageNode, presetId: WorkflowPresetId): void
+	onCreateVideo(node: ImageNode): void
 	onMotionTransfer(): void
 	onAnnotationChange(nodeId: string, paths: string[]): void
 	onAnnotationNoteChange(nodeId: string, note: string): void
@@ -2995,7 +3027,10 @@ function ImageNodeView({
 				</span>
 			</div>
 			{selected && (
-				<div className="tap-node__workflow-presets">
+				<div
+					className="tap-node__workflow-presets"
+					onPointerDown={(event) => event.stopPropagation()}
+				>
 					{(annotationMode || annotations.length > 0 || node.annotationNote) && (
 						<div className="tap-node__annotation-panel">
 							<div>
@@ -3026,6 +3061,14 @@ function ImageNodeView({
 							<span>图1保持形象，图2只提供动作姿态</span>
 						</button>
 					)}
+					<button
+						className="tap-node__workflow-motion"
+						type="button"
+						onClick={() => onCreateVideo(node)}
+					>
+						<strong>视频生成</strong>
+						<span>以这张图为首帧生成 Seedance 视频</span>
+					</button>
 					{WORKFLOW_PRESETS.map((preset) => (
 						<button key={preset.id} type="button" onClick={() => onWorkflowPreset(node, preset.id)}>
 							<strong>{preset.title}</strong>
