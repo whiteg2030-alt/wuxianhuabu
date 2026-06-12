@@ -580,7 +580,7 @@ function aiStudioApiPlugin(): Plugin {
 									},
 								]
 							: []),
-						...messages.map((message) => ({
+						...messages.map((message: any) => ({
 							role: message.role === 'assistant' ? 'assistant' : 'user',
 							content: getString(message.content),
 						})),
@@ -648,8 +648,8 @@ function aiStudioApiPlugin(): Plugin {
 					const ratio = getString(body.ratio) || 'adaptive'
 					const duration = normalizeVideoDuration(body.duration)
 					const generateAudio = body.generateAudio !== false
-					const images = Array.isArray(body.images)
-						? body.images
+					const images: Array<{ url: string; role: string }> = Array.isArray(body.images)
+						? (body.images as unknown[])
 								.map(normalizeVideoImageInput)
 								.filter((image): image is { url: string; role: string } => Boolean(image))
 						: []
@@ -1013,7 +1013,7 @@ async function readJsonBody(req: { on(event: string, handler: (chunk: Buffer) =>
 	const chunks: Buffer[] = []
 	await new Promise<void>((resolve, reject) => {
 		req.on('data', (chunk) => chunks.push(Buffer.from(chunk)))
-		req.on('end', resolve)
+		req.on('end', () => resolve())
 		req.on('error', reject)
 	})
 	const raw = Buffer.concat(chunks).toString('utf8')
