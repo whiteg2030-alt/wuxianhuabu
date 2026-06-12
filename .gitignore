@@ -106,6 +106,7 @@ apps/docs/api
 
 .dev.vars
 .env.local
+apps/examples/.cache
 .env.development.local
 .env*
 !.env.example

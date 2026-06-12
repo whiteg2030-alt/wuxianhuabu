@@ -1,5 +1,5 @@
 import { pbkdf2Sync, randomBytes, timingSafeEqual } from 'crypto'
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs'
+import { createReadStream, existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from 'fs'
 import path from 'path'
 import react from '@vitejs/plugin-react'
 import { Plugin, PluginOption, defineConfig, loadEnv } from 'vite'
@@ -729,6 +729,151 @@ function aiStudioApiPlugin(): Plugin {
 					sendJson(res, 500, { error: message })
 				}
 			})
+
+			server.middlewares.use('/api/video-task', async (req, res) => {
+				const requestUrl = new URL(req.url || '/', 'http://localhost')
+				const taskId = (requestUrl.searchParams.get('id') || '').trim()
+				if (!/^cgt-[A-Za-z0-9-]+$/.test(taskId)) {
+					sendJson(res, 400, { error: '任务 ID 无效。' })
+					return
+				}
+				const authHeader = getArkAuthorizationHeader()
+				if (!authHeader) {
+					sendJson(res, 503, { error: '火山引擎 ARK API Key 未配置，请在接口配置面板填写。' })
+					return
+				}
+
+				if (req.method === 'DELETE') {
+					try {
+						const response = await fetchWithTimeout(
+							`${getArkBaseUrl()}/contents/generations/tasks/${taskId}`,
+							{ method: 'DELETE', headers: { Authorization: authHeader } },
+							30_000
+						)
+						const responseText = await response.text()
+						if (!response.ok) {
+							const message =
+								getArkError(parseJsonSafely(responseText)) ||
+								`取消任务失败（HTTP ${response.status}）`
+							sendJson(res, response.status, { error: message })
+							return
+						}
+						sendJson(res, 200, { status: 'cancelled' })
+					} catch (err) {
+						sendJson(res, 500, { error: getErrorMessage(err) })
+					}
+					return
+				}
+
+				if (req.method !== 'GET') {
+					sendJson(res, 405, { error: 'Method not allowed' })
+					return
+				}
+
+				try {
+					const localVideoPath = getVideoCachePath(`${taskId}.mp4`)
+					if (existsSync(localVideoPath)) {
+						sendJson(res, 200, { status: 'succeeded', videoUrl: `/api/video-file/${taskId}.mp4` })
+						return
+					}
+
+					const response = await fetchWithTimeout(
+						`${getArkBaseUrl()}/contents/generations/tasks/${taskId}`,
+						{ method: 'GET', headers: { Authorization: authHeader } },
+						30_000
+					)
+					const responseText = await response.text()
+					const data = parseJsonSafely(responseText)
+					if (!response.ok) {
+						const message = getArkError(data) || `查询任务失败（HTTP ${response.status}）`
+						sendJson(res, response.status, { error: message })
+						return
+					}
+
+					const status = getString(data?.status)
+					if (status !== 'succeeded') {
+						sendJson(res, 200, {
+							status: status || 'running',
+							error: data?.error ? getArkError(data) : '',
+						})
+						return
+					}
+
+					const remoteVideoUrl = getString(data?.content?.video_url)
+					if (!remoteVideoUrl) {
+						sendJson(res, 502, { error: '任务成功但没有返回视频地址。' })
+						return
+					}
+					try {
+						await downloadVideoToCache(remoteVideoUrl, localVideoPath)
+						sendJson(res, 200, { status: 'succeeded', videoUrl: `/api/video-file/${taskId}.mp4` })
+					} catch (err) {
+						console.error('[ai-studio-api] Video download failed:', getErrorMessage(err))
+						sendJson(res, 200, {
+							status: 'succeeded',
+							videoUrl: remoteVideoUrl,
+							warning: '视频转存本地失败，当前链接 24 小时后过期，请及时下载。',
+						})
+					}
+				} catch (err) {
+					sendJson(res, 500, { error: getErrorMessage(err) })
+				}
+			})
+
+			server.middlewares.use('/api/video-file', async (req, res) => {
+				if (req.method !== 'GET') {
+					sendJson(res, 405, { error: 'Method not allowed' })
+					return
+				}
+				const requestUrl = new URL(req.url || '/', 'http://localhost')
+				const fileName = decodeURIComponent(requestUrl.pathname.replace(/^\/+/, ''))
+				if (!/^cgt-[A-Za-z0-9-]+\.mp4$/.test(fileName)) {
+					sendJson(res, 400, { error: '文件名无效。' })
+					return
+				}
+				const filePath = getVideoCachePath(fileName)
+				if (!existsSync(filePath)) {
+					sendJson(res, 404, { error: '视频文件不存在。' })
+					return
+				}
+
+				const fileSize = statSync(filePath).size
+				const rangeHeader = req.headers?.range
+				res.setHeader('Accept-Ranges', 'bytes')
+				res.setHeader('Content-Type', 'video/mp4')
+
+				const rangeMatch =
+					typeof rangeHeader === 'string' ? rangeHeader.match(/^bytes=(\d*)-(\d*)$/) : null
+				if (rangeMatch && (rangeMatch[1] || rangeMatch[2])) {
+					const start = rangeMatch[1]
+						? Number(rangeMatch[1])
+						: Math.max(0, fileSize - Number(rangeMatch[2]))
+					const end =
+						rangeMatch[1] && rangeMatch[2]
+							? Math.min(Number(rangeMatch[2]), fileSize - 1)
+							: fileSize - 1
+					if (
+						!Number.isFinite(start) ||
+						!Number.isFinite(end) ||
+						start > end ||
+						start >= fileSize
+					) {
+						res.statusCode = 416
+						res.setHeader('Content-Range', `bytes */${fileSize}`)
+						res.end()
+						return
+					}
+					res.statusCode = 206
+					res.setHeader('Content-Range', `bytes ${start}-${end}/${fileSize}`)
+					res.setHeader('Content-Length', String(end - start + 1))
+					createReadStream(filePath, { start, end }).pipe(res)
+					return
+				}
+
+				res.statusCode = 200
+				res.setHeader('Content-Length', String(fileSize))
+				createReadStream(filePath).pipe(res)
+			})
 		},
 	}
 }
@@ -1178,6 +1323,25 @@ function getArkError(data: any): string {
 	const code = getString(error.code)
 	const message = getString(error.message)
 	return [code, message].filter(Boolean).join(': ')
+}
+
+function getVideoCacheDir() {
+	return path.join(__dirname, '.cache', 'ai-videos')
+}
+
+function getVideoCachePath(fileName: string) {
+	return path.join(getVideoCacheDir(), fileName)
+}
+
+async function downloadVideoToCache(remoteUrl: string, localPath: string) {
+	const response = await fetchWithTimeout(remoteUrl, { method: 'GET' }, 300_000)
+	if (!response.ok) {
+		throw new Error(`视频下载失败（HTTP ${response.status}）`)
+	}
+	const buffer = Buffer.from(await response.arrayBuffer())
+	if (!buffer.length) throw new Error('视频内容为空。')
+	mkdirSync(getVideoCacheDir(), { recursive: true })
+	writeFileSync(localPath, buffer)
 }
 
 function getString(value: unknown) {
