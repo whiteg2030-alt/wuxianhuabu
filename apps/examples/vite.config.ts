@@ -622,6 +622,12 @@ function aiStudioApiPlugin(): Plugin {
 						return
 					}
 
+					const contentLength = Number(req.headers['content-length'] || 0)
+					if (contentLength > 70 * 1024 * 1024) {
+						sendJson(res, 413, { error: '请求体超过 70MB 限制，请压缩参考图后重试。' })
+						return
+					}
+
 					const body = await readJsonBody(req)
 					const model = getString(body.model) || DEFAULT_VIDEO_MODEL
 					const prompt = getString(body.prompt).trim()
@@ -661,6 +667,17 @@ function aiStudioApiPlugin(): Plugin {
 					}
 					if (images.length > 9) {
 						sendJson(res, 400, { error: '参考图最多 9 张。' })
+						return
+					}
+
+					const firstFrameCount = images.filter((image) => image.role === 'first_frame').length
+					const lastFrameCount = images.filter((image) => image.role === 'last_frame').length
+					if (firstFrameCount > 1) {
+						sendJson(res, 400, { error: '首帧参考图最多 1 张。' })
+						return
+					}
+					if (lastFrameCount > 1) {
+						sendJson(res, 400, { error: '尾帧参考图最多 1 张。' })
 						return
 					}
 
@@ -1128,7 +1145,9 @@ function saveArkSettings(apiKey: string, baseUrl: string) {
 }
 
 function normalizeVideoDuration(value: unknown): number | null {
-	const duration = Number(value ?? 5)
+	if (value === null || value === undefined) return 5
+	if (typeof value !== 'number' && typeof value !== 'string') return null
+	const duration = Number(value)
 	if (!Number.isInteger(duration)) return null
 	if (duration === -1) return -1
 	if (duration < 4 || duration > 15) return null
