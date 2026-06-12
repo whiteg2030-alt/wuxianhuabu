@@ -550,6 +550,7 @@ export default function AiCanvasAgentExample() {
 	)
 
 	const videoPollersRef = useRef(new Set<string>())
+	const cancelledVideoTasksRef = useRef(new Set<string>())
 
 	async function pollVideoTask(nodeId: string, taskId: string) {
 		if (videoPollersRef.current.has(taskId)) return
@@ -569,6 +570,7 @@ export default function AiCanvasAgentExample() {
 					continue
 				}
 				delay = VIDEO_POLL_INTERVAL_MS
+				if (cancelledVideoTasksRef.current.has(taskId)) return
 				const status = data.status || 'running'
 				if (status === 'succeeded' && data.videoUrl) {
 					updateVideoNode(nodeId, {
@@ -1643,6 +1645,7 @@ export default function AiCanvasAgentExample() {
 			return
 		}
 
+		if (videoNode.taskId) cancelledVideoTasksRef.current.delete(videoNode.taskId)
 		updateVideoNode(videoNode.id, {
 			status: 'submitting',
 			errorMessage: null,
@@ -1684,6 +1687,7 @@ export default function AiCanvasAgentExample() {
 			})
 			const data = (await response.json()) as VideoTaskResponse
 			if (!response.ok) throw new Error(data.error || '取消任务失败')
+			cancelledVideoTasksRef.current.add(videoNode.taskId)
 			updateVideoNode(videoNode.id, { status: 'cancelled', errorMessage: '任务已取消' })
 			setCanvasNotice('视频任务已取消')
 		} catch (err) {
@@ -3318,7 +3322,9 @@ function VideoNodeView({
 			) : null}
 			{statusText ? <div className="tap-video-status">{statusText}</div> : null}
 			{node.errorMessage && node.status !== 'succeeded' ? (
-				<div className="tap-node__error">{node.errorMessage}</div>
+				<div className={isWorking ? 'tap-video-warning' : 'tap-node__error'}>
+					{node.errorMessage}
+				</div>
 			) : null}
 			{node.errorMessage && node.status === 'succeeded' ? (
 				<div className="tap-video-warning">{node.errorMessage}</div>
