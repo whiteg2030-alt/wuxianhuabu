@@ -636,8 +636,10 @@ function aiStudioApiPlugin(): Plugin {
 					}
 
 					const contentLength = Number(req.headers['content-length'] || 0)
-					if (contentLength > 70 * 1024 * 1024) {
-						sendJson(res, 413, { error: '请求体超过 70MB 限制，请压缩参考图后重试。' })
+					if (contentLength > 64 * 1024 * 1024) {
+						sendJson(res, 413, {
+							error: '请求体超过 64MB 限制（火山方舟上限），请压缩参考图后重试。',
+						})
 						return
 					}
 
