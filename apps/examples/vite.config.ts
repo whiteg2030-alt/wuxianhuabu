@@ -1,6 +1,19 @@
 import { pbkdf2Sync, randomBytes, timingSafeEqual } from 'crypto'
-import { createReadStream, existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from 'fs'
+import {
+	createReadStream,
+	createWriteStream,
+	existsSync,
+	mkdirSync,
+	readFileSync,
+	renameSync,
+	statSync,
+	unlinkSync,
+	writeFileSync,
+} from 'fs'
+import type { ServerResponse } from 'http'
 import path from 'path'
+import { Readable } from 'stream'
+import { pipeline } from 'stream/promises'
 import react from '@vitejs/plugin-react'
 import { Plugin, PluginOption, defineConfig, loadEnv } from 'vite'
 
@@ -832,19 +845,20 @@ function aiStudioApiPlugin(): Plugin {
 					return
 				}
 				const filePath = getVideoCachePath(fileName)
-				if (!existsSync(filePath)) {
+				let fileSize = 0
+				try {
+					fileSize = statSync(filePath).size
+				} catch {
 					sendJson(res, 404, { error: '视频文件不存在。' })
 					return
 				}
-
-				const fileSize = statSync(filePath).size
 				const rangeHeader = req.headers?.range
 				res.setHeader('Accept-Ranges', 'bytes')
 				res.setHeader('Content-Type', 'video/mp4')
 
 				const rangeMatch =
 					typeof rangeHeader === 'string' ? rangeHeader.match(/^bytes=(\d*)-(\d*)$/) : null
-				if (rangeMatch && (rangeMatch[1] || rangeMatch[2])) {
+				if (rangeMatch && (rangeMatch[1] !== '' || rangeMatch[2] !== '')) {
 					const start = rangeMatch[1]
 						? Number(rangeMatch[1])
 						: Math.max(0, fileSize - Number(rangeMatch[2]))
@@ -866,13 +880,13 @@ function aiStudioApiPlugin(): Plugin {
 					res.statusCode = 206
 					res.setHeader('Content-Range', `bytes ${start}-${end}/${fileSize}`)
 					res.setHeader('Content-Length', String(end - start + 1))
-					createReadStream(filePath, { start, end }).pipe(res)
+					pipeVideoFileToResponse(filePath, res, { start, end })
 					return
 				}
 
 				res.statusCode = 200
 				res.setHeader('Content-Length', String(fileSize))
-				createReadStream(filePath).pipe(res)
+				pipeVideoFileToResponse(filePath, res)
 			})
 		},
 	}
@@ -1338,10 +1352,43 @@ async function downloadVideoToCache(remoteUrl: string, localPath: string) {
 	if (!response.ok) {
 		throw new Error(`视频下载失败（HTTP ${response.status}）`)
 	}
-	const buffer = Buffer.from(await response.arrayBuffer())
-	if (!buffer.length) throw new Error('视频内容为空。')
+	if (!response.body) {
+		throw new Error('视频内容为空。')
+	}
 	mkdirSync(getVideoCacheDir(), { recursive: true })
-	writeFileSync(localPath, buffer)
+	const tmpPath = `${localPath}.tmp`
+	try {
+		await pipeline(Readable.fromWeb(response.body as any), createWriteStream(tmpPath))
+		if (!statSync(tmpPath).size) {
+			throw new Error('视频内容为空。')
+		}
+		renameSync(tmpPath, localPath)
+	} catch (err) {
+		try {
+			unlinkSync(tmpPath)
+		} catch {
+			// best-effort cleanup
+		}
+		throw err
+	}
+}
+
+function pipeVideoFileToResponse(
+	filePath: string,
+	res: ServerResponse,
+	options?: { start: number; end: number }
+) {
+	const stream = options ? createReadStream(filePath, options) : createReadStream(filePath)
+	stream.on('error', (err) => {
+		if (res.headersSent) {
+			res.destroy(err instanceof Error ? err : new Error(String(err)))
+			return
+		}
+		res.removeHeader('Content-Length')
+		res.removeHeader('Content-Range')
+		sendJson(res, 500, { error: getErrorMessage(err) })
+	})
+	stream.pipe(res)
 }
 
 function getString(value: unknown) {
