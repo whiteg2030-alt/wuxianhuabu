@@ -1,6 +1,6 @@
-import path from 'path'
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs'
 import { pbkdf2Sync, randomBytes, timingSafeEqual } from 'crypto'
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs'
+import path from 'path'
 import react from '@vitejs/plugin-react'
 import { Plugin, PluginOption, defineConfig, loadEnv } from 'vite'
 
@@ -260,7 +260,8 @@ function aiStudioApiPlugin(): Plugin {
 					const authHeader = getAiAuthorizationHeader()
 					if (!authHeader) {
 						sendJson(res, 503, {
-							error: 'Image API key is not configured. Open the canvas interface settings and enter your API key.',
+							error:
+								'Image API key is not configured. Open the canvas interface settings and enter your API key.',
 						})
 						return
 					}
@@ -348,7 +349,8 @@ function aiStudioApiPlugin(): Plugin {
 					const authHeader = getAiAuthorizationHeader()
 					if (!authHeader) {
 						sendJson(res, 503, {
-							error: 'Image API key is not configured. Open the canvas interface settings and enter your API key.',
+							error:
+								'Image API key is not configured. Open the canvas interface settings and enter your API key.',
 						})
 						return
 					}
@@ -375,10 +377,27 @@ function aiStudioApiPlugin(): Plugin {
 						return
 					}
 
-					const generationPrompt = appendImageGenerationConstraints(prompt, aspectRatio, sourceImageUrls.length > 0)
+					const generationPrompt = appendImageGenerationConstraints(
+						prompt,
+						aspectRatio,
+						sourceImageUrls.length > 0
+					)
 					const imageUrls = sourceImageUrls.length
-						? await generateImageFromImage({ authHeader, model, prompt: generationPrompt, size, count, sourceImageUrls })
-						: await generateImageFromText({ authHeader, model, prompt: generationPrompt, size, count })
+						? await generateImageFromImage({
+								authHeader,
+								model,
+								prompt: generationPrompt,
+								size,
+								count,
+								sourceImageUrls,
+							})
+						: await generateImageFromText({
+								authHeader,
+								model,
+								prompt: generationPrompt,
+								size,
+								count,
+							})
 					if (!imageUrls.length) {
 						sendJson(res, 502, { error: 'The image API returned no image.' })
 						return
@@ -409,7 +428,8 @@ function aiStudioApiPlugin(): Plugin {
 					const authHeader = getAiAuthorizationHeader()
 					if (!authHeader) {
 						sendJson(res, 503, {
-							error: 'Image API key is not configured. Open the canvas interface settings and enter your API key.',
+							error:
+								'Image API key is not configured. Open the canvas interface settings and enter your API key.',
 						})
 						return
 					}
@@ -427,7 +447,9 @@ function aiStudioApiPlugin(): Plugin {
 						return
 					}
 					if (!isTextModelAllowed(model)) {
-						sendJson(res, 400, { error: `Model ${model} is not allowed for image prompt analysis.` })
+						sendJson(res, 400, {
+							error: `Model ${model} is not allowed for image prompt analysis.`,
+						})
 						return
 					}
 
@@ -476,7 +498,9 @@ function aiStudioApiPlugin(): Plugin {
 						return
 					}
 
-					const prompt = extractChatCompletionTextFromText(responseText).replace(/^["'“”]+|["'“”]+$/g, '').trim()
+					const prompt = extractChatCompletionTextFromText(responseText)
+						.replace(/^["'“”]+|["'“”]+$/g, '')
+						.trim()
 					sendJson(res, 200, { prompt, model })
 				} catch (err) {
 					const message = getErrorMessage(err)
@@ -495,7 +519,8 @@ function aiStudioApiPlugin(): Plugin {
 					const authHeader = getAiAuthorizationHeader()
 					if (!authHeader) {
 						sendJson(res, 503, {
-							error: 'Image API key is not configured. Open the canvas interface settings and enter your API key.',
+							error:
+								'Image API key is not configured. Open the canvas interface settings and enter your API key.',
 						})
 						return
 					}
@@ -518,18 +543,17 @@ function aiStudioApiPlugin(): Plugin {
 					const chatMessages = [
 						{
 							role: 'system',
-							content:
-								[
-									'You are a Lovart-like visual creation agent inside a Chinese infinite image canvas.',
-									'You can inspect a text summary of the canvas, plan the next visual step, write an image prompt, and decide whether the app should generate an image.',
-									'Do not expose hidden chain-of-thought. Provide only a concise visible thinking summary in Chinese.',
-									'Return JSON only with this shape: {"reply":"中文回复","thinking":["高层思考摘要1","高层思考摘要2"],"action":"answer|create_prompt|generate_image","prompt":"用于图片生成的完整提示词","size":"1:1|3:4|4:3|16:9|9:16","count":1}.',
-									'When the user asks for multiple images, set count to 2, 3, or 4. Do not ask the image model to create one collage.',
-									'Use action "generate_image" when the user asks to create or continue an image. Use "create_prompt" when generation should wait. Use "answer" only for non-generation questions.',
-									'Users attach image parameters from selected canvas image nodes. Treat attached referenceImages as the chosen visual references and write the prompt for multi-image reference generation.',
-									'If no attached image parameters exist but selected image nodes exist in the canvas summary, assume selected images are visual references. If neither exists, write for text-to-image generation.',
-									'Keep all user-facing text in Simplified Chinese.',
-								].join('\n'),
+							content: [
+								'You are a Lovart-like visual creation agent inside a Chinese infinite image canvas.',
+								'You can inspect a text summary of the canvas, plan the next visual step, write an image prompt, and decide whether the app should generate an image.',
+								'Do not expose hidden chain-of-thought. Provide only a concise visible thinking summary in Chinese.',
+								'Return JSON only with this shape: {"reply":"中文回复","thinking":["高层思考摘要1","高层思考摘要2"],"action":"answer|create_prompt|generate_image","prompt":"用于图片生成的完整提示词","size":"1:1|3:4|4:3|16:9|9:16","count":1}.',
+								'When the user asks for multiple images, set count to 2, 3, or 4. Do not ask the image model to create one collage.',
+								'Use action "generate_image" when the user asks to create or continue an image. Use "create_prompt" when generation should wait. Use "answer" only for non-generation questions.',
+								'Users attach image parameters from selected canvas image nodes. Treat attached referenceImages as the chosen visual references and write the prompt for multi-image reference generation.',
+								'If no attached image parameters exist but selected image nodes exist in the canvas summary, assume selected images are visual references. If neither exists, write for text-to-image generation.',
+								'Keep all user-facing text in Simplified Chinese.',
+							].join('\n'),
 						},
 						...(canvasSummary
 							? [
@@ -581,6 +605,110 @@ function aiStudioApiPlugin(): Plugin {
 				} catch (err) {
 					const message = getErrorMessage(err)
 					console.error('[ai-studio-api] Agent chat failed:', message)
+					sendJson(res, 500, { error: message })
+				}
+			})
+
+			server.middlewares.use('/api/generate-video', async (req, res) => {
+				if (req.method !== 'POST') {
+					sendJson(res, 405, { error: 'Method not allowed' })
+					return
+				}
+
+				try {
+					const authHeader = getArkAuthorizationHeader()
+					if (!authHeader) {
+						sendJson(res, 503, { error: '火山引擎 ARK API Key 未配置，请在接口配置面板填写。' })
+						return
+					}
+
+					const body = await readJsonBody(req)
+					const model = getString(body.model) || DEFAULT_VIDEO_MODEL
+					const prompt = getString(body.prompt).trim()
+					const resolution = getString(body.resolution) || '720p'
+					const ratio = getString(body.ratio) || 'adaptive'
+					const duration = normalizeVideoDuration(body.duration)
+					const generateAudio = body.generateAudio !== false
+					const images = Array.isArray(body.images)
+						? body.images
+								.map(normalizeVideoImageInput)
+								.filter((image): image is { url: string; role: string } => Boolean(image))
+						: []
+
+					if (!prompt) {
+						sendJson(res, 400, { error: '请输入视频提示词。' })
+						return
+					}
+					if (!VIDEO_MODEL_IDS.has(model)) {
+						sendJson(res, 400, { error: `模型 ${model} 不在视频生成白名单内。` })
+						return
+					}
+					if (!VIDEO_RESOLUTIONS.has(resolution)) {
+						sendJson(res, 400, { error: `不支持的分辨率 ${resolution}。` })
+						return
+					}
+					if (model.includes('-fast-') && resolution === '1080p') {
+						sendJson(res, 400, { error: '快速版模型最高支持 720p，请切换分辨率或使用标准版模型。' })
+						return
+					}
+					if (!VIDEO_RATIOS.has(ratio)) {
+						sendJson(res, 400, { error: `不支持的画幅比例 ${ratio}。` })
+						return
+					}
+					if (duration === null) {
+						sendJson(res, 400, { error: '时长必须是 4-15 秒的整数，或 -1 表示自适应。' })
+						return
+					}
+					if (images.length > 9) {
+						sendJson(res, 400, { error: '参考图最多 9 张。' })
+						return
+					}
+
+					const content = [
+						{ type: 'text', text: prompt },
+						...images.map((image) => ({
+							type: 'image_url',
+							image_url: { url: image.url },
+							role: image.role,
+						})),
+					]
+					const response = await fetchWithTimeout(
+						`${getArkBaseUrl()}/contents/generations/tasks`,
+						{
+							method: 'POST',
+							headers: {
+								Authorization: authHeader,
+								'Content-Type': 'application/json',
+							},
+							body: JSON.stringify({
+								model,
+								content,
+								resolution,
+								ratio,
+								duration,
+								generate_audio: generateAudio,
+								watermark: false,
+							}),
+						},
+						60_000
+					)
+					const responseText = await response.text()
+					const data = parseJsonSafely(responseText)
+					if (!response.ok) {
+						const message = getArkError(data) || `视频任务创建失败（HTTP ${response.status}）`
+						console.error('[ai-studio-api] Video task creation failed:', message)
+						sendJson(res, response.status, { error: message })
+						return
+					}
+					const taskId = getString(data?.id)
+					if (!taskId) {
+						sendJson(res, 502, { error: '火山方舟没有返回任务 ID。' })
+						return
+					}
+					sendJson(res, 200, { taskId })
+				} catch (err) {
+					const message = getErrorMessage(err)
+					console.error('[ai-studio-api] Video generation failed:', message)
 					sendJson(res, 500, { error: message })
 				}
 			})
@@ -940,7 +1068,10 @@ function saveAiSettings(apiKey: string, baseUrl: string) {
 
 	if (!foundApiKey) nextLines.push(`IMAGE_API_KEY=${apiKey}`)
 	if (baseUrl && !foundBaseUrl) nextLines.push(`IMAGE_GATEWAY_BASE_URL=${baseUrl}`)
-	writeFileSync(envPath, `${nextLines.filter((line, index) => line || index < nextLines.length - 1).join('\n')}\n`)
+	writeFileSync(
+		envPath,
+		`${nextLines.filter((line, index) => line || index < nextLines.length - 1).join('\n')}\n`
+	)
 	process.env.IMAGE_API_KEY = apiKey
 	delete process.env.IMAGE_GATEWAY_API_KEY
 	delete process.env.API_KEY
@@ -984,13 +1115,50 @@ function saveArkSettings(apiKey: string, baseUrl: string) {
 	})
 	if (!foundApiKey) nextLines.push(`ARK_API_KEY=${apiKey}`)
 	if (baseUrl && !foundBaseUrl) nextLines.push(`ARK_BASE_URL=${baseUrl}`)
-	writeFileSync(envPath, `${nextLines.filter((line, index) => line || index < nextLines.length - 1).join('\n')}\n`)
+	writeFileSync(
+		envPath,
+		`${nextLines.filter((line, index) => line || index < nextLines.length - 1).join('\n')}\n`
+	)
 	process.env.ARK_API_KEY = apiKey
 	if (baseUrl) {
 		process.env.ARK_BASE_URL = baseUrl
 	} else {
 		delete process.env.ARK_BASE_URL
 	}
+}
+
+function normalizeVideoDuration(value: unknown): number | null {
+	const duration = Number(value ?? 5)
+	if (!Number.isInteger(duration)) return null
+	if (duration === -1) return -1
+	if (duration < 4 || duration > 15) return null
+	return duration
+}
+
+function normalizeVideoImageInput(value: unknown): { url: string; role: string } | null {
+	if (!value || typeof value !== 'object') return null
+	const input = value as { url?: unknown; role?: unknown }
+	const url = getString(input.url).trim()
+	const role = getString(input.role).trim()
+	if (!url || !VIDEO_IMAGE_ROLES.has(role)) return null
+	if (!url.startsWith('data:image/') && !/^https?:\/\//.test(url)) return null
+	return { url, role }
+}
+
+function parseJsonSafely(value: string): any {
+	try {
+		return JSON.parse(value)
+	} catch {
+		return null
+	}
+}
+
+function getArkError(data: any): string {
+	const error = data?.error
+	if (!error) return ''
+	const code = getString(error.code)
+	const message = getString(error.message)
+	return [code, message].filter(Boolean).join(': ')
 }
 
 function getString(value: unknown) {
@@ -1044,7 +1212,11 @@ function normalizeImageCount(value: unknown) {
 	return Math.min(4, Math.max(1, Math.round(count)))
 }
 
-function appendImageGenerationConstraints(prompt: string, aspectRatio: string, hasReferenceImages: boolean) {
+function appendImageGenerationConstraints(
+	prompt: string,
+	aspectRatio: string,
+	hasReferenceImages: boolean
+) {
 	const constraints: string[] = []
 	if (aspectRatio === '16:9') {
 		constraints.push(
@@ -1096,7 +1268,9 @@ async function fetchGatewayModels(authHeader: string) {
 	if (!response.ok) {
 		throw new Error(getAiError(data))
 	}
-	return Array.isArray(data?.data) ? data.data.map((model: any) => getString(model.id)).filter(Boolean) : []
+	return Array.isArray(data?.data)
+		? data.data.map((model: any) => getString(model.id)).filter(Boolean)
+		: []
 }
 
 function filterGatewayModels(modelIds: string[]) {
@@ -1199,7 +1373,13 @@ async function generateImageFromImage({
 	const prompts = createStandaloneImagePrompts(prompt, count)
 	const urls = await Promise.all(
 		prompts.map((standalonePrompt) =>
-			generateSingleImageFromImage({ authHeader, model, prompt: standalonePrompt, size, sourceImageUrls })
+			generateSingleImageFromImage({
+				authHeader,
+				model,
+				prompt: standalonePrompt,
+				size,
+				sourceImageUrls,
+			})
 		)
 	)
 	return uniqueStrings(urls.flat()).slice(0, count)
@@ -1260,7 +1440,9 @@ async function generateMultipartImageEdit({
 	sourceImageUrls: string[]
 	imageFieldName: 'image' | 'image[]'
 }) {
-	const imageBlobs = await Promise.all(sourceImageUrls.map((sourceImageUrl) => imageSourceToBlob(sourceImageUrl)))
+	const imageBlobs = await Promise.all(
+		sourceImageUrls.map((sourceImageUrl) => imageSourceToBlob(sourceImageUrl))
+	)
 	const formData = new FormData()
 	formData.append('model', model)
 	formData.append('prompt', prompt)
@@ -1372,7 +1554,9 @@ function extractImagesFromText(value: string) {
 	)
 	if (markdownUrls.length) return uniqueStrings(markdownUrls)
 
-	const plainUrls = (value.match(/https?:\/\/\S+/g) || []).map((url) => url.replace(/[)\].,]+$/, ''))
+	const plainUrls = (value.match(/https?:\/\/\S+/g) || []).map((url) =>
+		url.replace(/[)\].,]+$/, '')
+	)
 	return uniqueStrings(plainUrls)
 }
 
@@ -1382,7 +1566,9 @@ function uniqueStrings(values: string[]) {
 
 function getAiError(data: unknown) {
 	if (data && typeof data === 'object' && 'error' in data) {
-		const error = (data as { error?: { message?: string; type?: string; param?: string; code?: string } }).error
+		const error = (
+			data as { error?: { message?: string; type?: string; param?: string; code?: string } }
+		).error
 		if (typeof error?.message === 'string') return error.message
 	}
 	return 'OpenAI-compatible API request failed.'
@@ -1467,11 +1653,19 @@ function parseAgentChatPlan(
 		const prompt = getString(data.prompt || data.imagePrompt).trim()
 		let action = normalizeAgentAction(getString(data.action), prompt, autoGenerate)
 		if (!autoGenerate && action === 'generate_image') action = 'create_prompt'
-		if (!prompt && action === 'answer' && fallback.prompt && shouldRequestGenerateImage(userRequest)) {
+		if (
+			!prompt &&
+			action === 'answer' &&
+			fallback.prompt &&
+			shouldRequestGenerateImage(userRequest)
+		) {
 			return fallback
 		}
 		const thinking = Array.isArray(data.thinking)
-			? data.thinking.map((item: unknown) => getString(item).trim()).filter(Boolean).slice(0, 5)
+			? data.thinking
+					.map((item: unknown) => getString(item).trim())
+					.filter(Boolean)
+					.slice(0, 5)
 			: []
 		return {
 			message: getString(data.reply || data.message).trim() || content,
@@ -1479,7 +1673,9 @@ function parseAgentChatPlan(
 			action,
 			prompt,
 			size: normalizeAgentSize(getString(data.size || data.aspectRatio)),
-			count: normalizeImageCount(data.count || data.n || inferImageCount(`${prompt} ${content} ${userRequest}`)),
+			count: normalizeImageCount(
+				data.count || data.n || inferImageCount(`${prompt} ${content} ${userRequest}`)
+			),
 		}
 	} catch {
 		return fallback
@@ -1494,13 +1690,15 @@ function createFallbackAgentPlan(
 ) {
 	const count = inferImageCount(userRequest)
 	const prompt = createFallbackImagePrompt(userRequest, referenceImages, count)
-	const shouldGenerate = shouldRequestGenerateImage(userRequest) || Boolean(referenceImages.length && prompt)
+	const shouldGenerate =
+		shouldRequestGenerateImage(userRequest) || Boolean(referenceImages.length && prompt)
 	return {
 		message: prompt
 			? '模型这次没有返回有效内容，我已根据你的请求和引用图生成可执行提示词。'
 			: modelContent || '模型这次没有返回有效内容，请补充生成目标后重试。',
 		thinking: ['读取当前画布和引用图', '根据用户原始需求生成兜底提示词'],
-		action: prompt && shouldGenerate ? (autoGenerate ? 'generate_image' : 'create_prompt') : 'answer',
+		action:
+			prompt && shouldGenerate ? (autoGenerate ? 'generate_image' : 'create_prompt') : 'answer',
 		prompt,
 		size: inferAspectRatioFromText(userRequest),
 		count,
@@ -1514,12 +1712,17 @@ function createFallbackImagePrompt(userRequest: string, referenceImages: string[
 		.map((item) => item.split('|')[0]?.trim())
 		.filter(Boolean)
 		.join('、')
-	const referenceText = references ? `参考 ${references} 的主体风格、构图、比例、材质细节与整体视觉气质。` : ''
+	const referenceText = references
+		? `参考 ${references} 的主体风格、构图、比例、材质细节与整体视觉气质。`
+		: ''
 	const countText =
-		count > 1
-			? `生成 ${count} 张彼此独立的图片，每张是单独作品，不要拼图、网格、分屏或合集。`
-			: ''
-	return [referenceText, request, countText, '画面要完整、清晰、精致，不添加文字、水印、边框或 UI 元素。']
+		count > 1 ? `生成 ${count} 张彼此独立的图片，每张是单独作品，不要拼图、网格、分屏或合集。` : ''
+	return [
+		referenceText,
+		request,
+		countText,
+		'画面要完整、清晰、精致，不添加文字、水印、边框或 UI 元素。',
+	]
 		.filter(Boolean)
 		.join(' ')
 }
