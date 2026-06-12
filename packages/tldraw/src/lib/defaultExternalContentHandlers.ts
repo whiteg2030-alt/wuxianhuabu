@@ -1,0 +1,900 @@
+import {
+	AssetRecordType,
+	Editor,
+	TLAsset,
+	TLAssetId,
+	TLBookmarkAsset,
+	TLBookmarkShape,
+	TLContent,
+	TLFileExternalAsset,
+	TLFileReplaceExternalContent,
+	TLImageAsset,
+	TLImageShape,
+	TLShapeId,
+	TLShapePartial,
+	TLTextShape,
+	TLTextShapeProps,
+	TLUrlExternalAsset,
+	TLVideoAsset,
+	Vec,
+	VecLike,
+	assert,
+	createShapeId,
+	fetch,
+	getHashForBuffer,
+	getHashForString,
+	maybeSnapToGrid,
+	toRichText,
+} from '@tldraw/editor'
+import { EmbedDefinition } from './defaultEmbedDefinitions'
+import { createBookmarkFromUrl } from './shapes/bookmark/bookmarks'
+import { EmbedShapeUtil } from './shapes/embed/EmbedShapeUtil'
+import { getCroppedImageDataForReplacedImage } from './shapes/shared/crop'
+import { FONT_SIZES, TEXT_PROPS, getFontFamily } from './shapes/shared/default-shape-constants'
+import { TLUiToastsContextType } from './ui/context/toasts'
+import { useTranslation } from './ui/hooks/useTranslation/useTranslation'
+import { putExcalidrawContent } from './utils/excalidraw/putExcalidrawContent'
+import { renderHtmlFromRichTextForMeasurement, renderRichTextFromHTML } from './utils/text/richText'
+import { cleanupText, isRightToLeftLanguage } from './utils/text/text'
+
+/**
+ * 5000px
+ * @public
+ */
+export const DEFAULT_MAX_IMAGE_DIMENSION = 5000
+/**
+ * 10mb
+ * @public
+ */
+export const DEFAULT_MAX_ASSET_SIZE = 10 * 1024 * 1024
+
+/** @public */
+export interface TLExternalContentProps {
+	/**
+	 * The maximum dimension (width or height) of an image. Images larger than this will be rescaled
+	 * to fit. Defaults to infinity.
+	 */
+	maxImageDimension?: number
+	/**
+	 * The maximum size (in bytes) of an asset. Assets larger than this will be rejected. Defaults
+	 * to 10mb (10 * 1024 * 1024).
+	 */
+	maxAssetSize?: number
+	/**
+	 * The mime types of images that are allowed to be handled. When passed to
+	 * the `Tldraw` component, this also reconfigures the default `ImageAssetUtil`
+	 * to only accept files matching these types. If you only want to accept a
+	 * subset of image types and want to additionally block videos, pass
+	 * `acceptedVideoMimeTypes={[]}`. A file is accepted if its MIME type is in
+	 * this list, in `acceptedVideoMimeTypes`, or if any registered asset util
+	 * accepts it.
+	 */
+	acceptedImageMimeTypes?: readonly string[]
+	/**
+	 * The mime types of videos that are allowed to be handled. When passed to
+	 * the `Tldraw` component, this also reconfigures the default `VideoAssetUtil`
+	 * to only accept files matching these types. A file is accepted if its MIME
+	 * type is in this list, in `acceptedImageMimeTypes`, or if any registered
+	 * asset util accepts it.
+	 */
+	acceptedVideoMimeTypes?: readonly string[]
+}
+
+/** @public */
+export interface TLDefaultExternalContentHandlerOpts extends TLExternalContentProps {
+	toasts: TLUiToastsContextType
+	msg: ReturnType<typeof useTranslation>
+}
+
+/** @public */
+export function registerDefaultExternalContentHandlers(
+	editor: Editor,
+	options: TLDefaultExternalContentHandlerOpts
+) {
+	// files -> asset
+	editor.registerExternalAssetHandler('file', async (externalAsset) => {
+		return defaultHandleExternalFileAsset(editor, externalAsset, options)
+	})
+
+	// urls -> bookmark asset
+	editor.registerExternalAssetHandler('url', async (externalAsset) => {
+		return defaultHandleExternalUrlAsset(editor, externalAsset, options)
+	})
+
+	// svg text
+	editor.registerExternalContentHandler('svg-text', async (externalContent) => {
+		return defaultHandleExternalSvgTextContent(editor, externalContent)
+	})
+
+	// embeds
+	editor.registerExternalContentHandler<'embed', EmbedDefinition>('embed', (externalContent) => {
+		return defaultHandleExternalEmbedContent(editor, externalContent)
+	})
+
+	// files
+	editor.registerExternalContentHandler('files', async (externalContent) => {
+		return defaultHandleExternalFileContent(editor, externalContent, options)
+	})
+
+	// file-replace -> asset
+	editor.registerExternalContentHandler('file-replace', async (externalContent) => {
+		return defaultHandleExternalFileReplaceContent(editor, externalContent, options)
+	})
+
+	// text
+	editor.registerExternalContentHandler('text', async (externalContent) => {
+		return defaultHandleExternalTextContent(editor, externalContent)
+	})
+
+	// url
+	editor.registerExternalContentHandler('url', async (externalContent) => {
+		return defaultHandleExternalUrlContent(editor, externalContent, options)
+	})
+
+	// tldraw
+	editor.registerExternalContentHandler('tldraw', async (externalContent) => {
+		return defaultHandleExternalTldrawContent(editor, externalContent)
+	})
+
+	// excalidraw
+	editor.registerExternalContentHandler('excalidraw', async (externalContent) => {
+		return defaultHandleExternalExcalidrawContent(editor, externalContent)
+	})
+}
+
+/** @public */
+export async function defaultHandleExternalFileAsset(
+	editor: Editor,
+	{ file, assetId }: TLFileExternalAsset,
+	options: TLDefaultExternalContentHandlerOpts
+) {
+	const isSuccess = notifyIfFileNotAllowed(editor, file, options)
+	if (!isSuccess) assert(false, 'File checks failed')
+
+	const sanitizedFile = await maybeSanitizeSvgFile(file)
+	if (!sanitizedFile) assert(false, 'SVG file contained no safe content')
+	const assetInfo = await getAssetInfo(editor, sanitizedFile, assetId)
+	if (!assetInfo) assert(false, `No asset util found for MIME type "${file.type}"`)
+	const result = await editor.uploadAsset(assetInfo, sanitizedFile)
+	assetInfo.props.src = result.src
+	if (result.meta) assetInfo.meta = { ...assetInfo.meta, ...result.meta }
+
+	return AssetRecordType.create(assetInfo)
+}
+
+/** @public */
+export async function defaultHandleExternalFileReplaceContent(
+	editor: Editor,
+	{ file, shapeId }: TLFileReplaceExternalContent,
+	options: TLDefaultExternalContentHandlerOpts
+) {
+	const isSuccess = notifyIfFileNotAllowed(editor, file, options)
+	if (!isSuccess) assert(false, 'File checks failed')
+
+	const sanitizedFile = await maybeSanitizeSvgFile(file)
+	if (!sanitizedFile) return
+	const shape = editor.getShape(shapeId)
+	if (!shape) assert(false, 'Shape not found')
+
+	const hash = getHashForBuffer(await sanitizedFile.arrayBuffer())
+	const assetId = AssetRecordType.createId(hash)
+	editor.createTemporaryAssetPreview(assetId, sanitizedFile)
+	const assetInfoPartial = (await getAssetInfo(editor, sanitizedFile, assetId)) as
+		| TLImageAsset
+		| TLVideoAsset
+		| null
+	if (!assetInfoPartial) return
+	editor.createAssets([assetInfoPartial])
+
+	// And update the shape
+	if (shape.type === 'image') {
+		const imageShape = shape as TLImageShape
+		const currentCrop = imageShape.props.crop
+
+		// Calculate new dimensions that preserve the current visual size of the cropped area
+		let newWidth = assetInfoPartial.props.w
+		let newHeight = assetInfoPartial.props.h
+		let newX = imageShape.x
+		let newY = imageShape.y
+		let finalCrop = currentCrop
+
+		if (currentCrop) {
+			// Use the dedicated function to calculate the new crop and dimensions
+			const result = getCroppedImageDataForReplacedImage(
+				imageShape,
+				assetInfoPartial.props.w,
+				assetInfoPartial.props.h
+			)
+
+			finalCrop = result.crop
+			newWidth = result.w
+			newHeight = result.h
+			newX = result.x
+			newY = result.y
+		}
+
+		editor.updateShapes([
+			{
+				id: imageShape.id,
+				type: imageShape.type,
+				props: {
+					assetId: assetId,
+					crop: finalCrop,
+					w: newWidth,
+					h: newHeight,
+				},
+				x: newX,
+				y: newY,
+			},
+		])
+	} else if (shape.type === 'video') {
+		editor.updateShapes([
+			{
+				id: shape.id,
+				type: shape.type,
+				props: {
+					assetId: assetId,
+					w: assetInfoPartial.props.w,
+					h: assetInfoPartial.props.h,
+				},
+			},
+		])
+	}
+
+	const asset = (await editor.getAssetForExternalContent({
+		type: 'file',
+		file: sanitizedFile,
+		assetId,
+	})) as TLAsset
+
+	editor.updateAssets([{ ...asset, id: assetId }])
+
+	return asset
+}
+
+/** @public */
+export async function defaultHandleExternalUrlAsset(
+	editor: Editor,
+	{ url }: TLUrlExternalAsset,
+	{ toasts, msg }: TLDefaultExternalContentHandlerOpts
+): Promise<TLBookmarkAsset> {
+	let meta: { image: string; favicon: string; title: string; description: string }
+
+	try {
+		const resp = await fetch(url, {
+			method: 'GET',
+			mode: 'no-cors',
+		})
+		const html = await resp.text()
+		const doc = new DOMParser().parseFromString(html, 'text/html')
+		meta = {
+			image: doc.head.querySelector('meta[property="og:image"]')?.getAttribute('content') ?? '',
+			favicon:
+				doc.head.querySelector('link[rel="apple-touch-icon"]')?.getAttribute('href') ??
+				doc.head.querySelector('link[rel="icon"]')?.getAttribute('href') ??
+				'',
+			title: doc.head.querySelector('meta[property="og:title"]')?.getAttribute('content') ?? url,
+			description:
+				doc.head.querySelector('meta[property="og:description"]')?.getAttribute('content') ?? '',
+		}
+		if (!meta.image.startsWith('http')) {
+			meta.image = new URL(meta.image, url).href
+		}
+		if (!meta.favicon.startsWith('http')) {
+			meta.favicon = new URL(meta.favicon, url).href
+		}
+	} catch (error) {
+		console.error(error)
+		toasts.addToast({
+			title: msg('assets.url.failed'),
+			severity: 'error',
+		})
+		meta = { image: '', favicon: '', title: '', description: '' }
+	}
+
+	// Create the bookmark asset from the meta
+	return {
+		id: AssetRecordType.createId(getHashForString(url)),
+		typeName: 'asset',
+		type: 'bookmark',
+		props: {
+			src: url,
+			description: meta.description,
+			image: meta.image,
+			favicon: meta.favicon,
+			title: meta.title,
+		},
+		meta: {},
+	} as TLBookmarkAsset
+}
+
+/** @public */
+export async function defaultHandleExternalSvgTextContent(
+	editor: Editor,
+	{ point, text }: { point?: VecLike; text: string }
+) {
+	const { sanitizeSvg } = await import('./utils/svg/sanitizeSvg')
+	text = sanitizeSvg(text)
+	if (!text) return
+
+	const position =
+		point ??
+		(editor.inputs.getShiftKey()
+			? editor.inputs.getCurrentPagePoint()
+			: editor.getViewportPageBounds().center)
+
+	const svg = new DOMParser().parseFromString(text, 'image/svg+xml').querySelector('svg')
+	if (!svg) {
+		throw new Error('No <svg/> element present')
+	}
+
+	let width = parseFloat(svg.getAttribute('width') || '0')
+	let height = parseFloat(svg.getAttribute('height') || '0')
+
+	if (!(width && height)) {
+		const doc = editor.getContainerDocument()
+		doc.body.appendChild(svg)
+		const box = svg.getBoundingClientRect()
+		doc.body.removeChild(svg)
+
+		width = box.width
+		height = box.height
+	}
+
+	const asset = await editor.getAssetForExternalContent({
+		type: 'file',
+		file: new File([text], 'asset.svg', { type: 'image/svg+xml' }),
+	})
+
+	if (!asset) throw Error('Could not create an asset')
+
+	createShapesForAssets(editor, [asset], position)
+}
+
+/** @public */
+export function defaultHandleExternalEmbedContent<T>(
+	editor: Editor,
+	{ point, url, embed }: { point?: VecLike; url: string; embed: T }
+) {
+	const position =
+		point ??
+		(editor.inputs.getShiftKey()
+			? editor.inputs.getCurrentPagePoint()
+			: editor.getViewportPageBounds().center)
+
+	const { width, height } = embed as { width: number; height: number }
+
+	const id = createShapeId()
+
+	const newPoint = maybeSnapToGrid(
+		new Vec(position.x - (width || 450) / 2, position.y - (height || 450) / 2),
+		editor
+	)
+	const shapePartial: TLShapePartial = {
+		id,
+		type: 'embed',
+		x: newPoint.x,
+		y: newPoint.y,
+		props: {
+			w: width,
+			h: height,
+			url,
+		},
+	}
+
+	if (editor.canCreateShape(shapePartial)) {
+		editor.createShape(shapePartial).select(id)
+	}
+}
+
+/** @public */
+export async function defaultHandleExternalFileContent(
+	editor: Editor,
+	{ point, files }: { point?: VecLike; files: File[] },
+	options: TLDefaultExternalContentHandlerOpts
+) {
+	const { toasts, msg } = options
+	if (files.length > editor.options.maxFilesAtOnce) {
+		toasts.addToast({ title: msg('assets.files.amount-too-many'), severity: 'error' })
+		return
+	}
+
+	const position =
+		point ??
+		(editor.inputs.getShiftKey()
+			? editor.inputs.getCurrentPagePoint()
+			: editor.getViewportPageBounds().center)
+
+	const pagePoint = new Vec(position.x, position.y)
+	const assetPartials: TLAsset[] = []
+	const assetsToUpdate: {
+		asset: TLAsset
+		file: File
+	}[] = []
+	for (const file of files) {
+		const isSuccess = notifyIfFileNotAllowed(editor, file, options)
+		if (!isSuccess) continue
+
+		const sanitizedFile = await maybeSanitizeSvgFile(file)
+		if (!sanitizedFile) {
+			toasts.addToast({
+				title: msg('assets.files.upload-failed'),
+				severity: 'error',
+			})
+			continue
+		}
+		const assetInfo = await getAssetInfo(editor, sanitizedFile)
+		if (!assetInfo) continue
+		if (assetInfo.type === 'image') {
+			editor.createTemporaryAssetPreview(assetInfo.id, sanitizedFile)
+		}
+		assetPartials.push(assetInfo)
+		assetsToUpdate.push({ asset: assetInfo, file: sanitizedFile })
+	}
+
+	Promise.allSettled(
+		assetsToUpdate.map(async (assetAndFile) => {
+			try {
+				const newAsset = await editor.getAssetForExternalContent({
+					type: 'file',
+					file: assetAndFile.file,
+				})
+
+				if (!newAsset) {
+					throw Error('Could not create an asset')
+				}
+
+				// Save the new asset under the old asset's id
+				editor.updateAssets([{ ...newAsset, id: assetAndFile.asset.id }])
+			} catch (error) {
+				toasts.addToast({
+					title: msg('assets.files.upload-failed'),
+					severity: 'error',
+				})
+				console.error(error)
+				editor.deleteAssets([assetAndFile.asset.id])
+				return
+			}
+		})
+	)
+
+	createShapesForAssets(editor, assetPartials, pagePoint)
+}
+
+/** @public */
+export async function defaultHandleExternalTextContent(
+	editor: Editor,
+	{ point, text, html }: { point?: VecLike; text: string; html?: string }
+) {
+	const p =
+		point ??
+		(editor.inputs.getShiftKey()
+			? editor.inputs.getCurrentPagePoint()
+			: editor.getViewportPageBounds().center)
+
+	const defaultProps = editor.getShapeUtil<TLTextShape>('text').getDefaultProps()
+
+	const cleanedUpPlaintext = cleanupText(text)
+	const richTextToPaste = html
+		? renderRichTextFromHTML(editor, html)
+		: toRichText(cleanedUpPlaintext)
+
+	// todo: discuss
+	// If we have one shape with rich text selected, update the shape's text.
+	// const onlySelectedShape = editor.getOnlySelectedShape()
+	// if (onlySelectedShape && 'richText' in onlySelectedShape.props) {
+	// 	editor.updateShapes([
+	// 		{
+	// 			id: onlySelectedShape.id,
+	// 			type: onlySelectedShape.type,
+	// 			props: {
+	// 				richText: richTextToPaste,
+	// 			},
+	// 		},
+	// 	])
+
+	// 	return
+	// }
+
+	// Measure the text with default values
+	let w: number
+	let h: number
+	let autoSize: boolean
+	let align = 'middle' as TLTextShapeProps['textAlign']
+
+	const htmlToMeasure = renderHtmlFromRichTextForMeasurement(editor, richTextToPaste)
+	const isMultiLine = richTextToPaste.content.length > 1
+
+	// check whether the text contains the most common characters in RTL languages
+	const isRtl = isRightToLeftLanguage(cleanedUpPlaintext)
+
+	if (isMultiLine) {
+		align = isMultiLine ? (isRtl ? 'end' : 'start') : 'middle'
+	}
+
+	const theme = editor.getCurrentTheme()
+
+	const rawSize = editor.textMeasure.measureHtml(htmlToMeasure, {
+		...TEXT_PROPS,
+		lineHeight: theme.lineHeight,
+		fontFamily: getFontFamily(theme, defaultProps.font),
+		fontSize: theme.fontSize * FONT_SIZES[defaultProps.size],
+		maxWidth: null,
+	})
+
+	const minWidth = Math.min(
+		isMultiLine ? editor.getViewportPageBounds().width * 0.9 : 920,
+		Math.max(200, editor.getViewportPageBounds().width * 0.9)
+	)
+
+	if (rawSize.w > minWidth) {
+		const shrunkSize = editor.textMeasure.measureHtml(htmlToMeasure, {
+			...TEXT_PROPS,
+			lineHeight: theme.lineHeight,
+			fontFamily: getFontFamily(theme, defaultProps.font),
+			fontSize: theme.fontSize * FONT_SIZES[defaultProps.size],
+			maxWidth: minWidth,
+		})
+		w = shrunkSize.w
+		h = shrunkSize.h
+		autoSize = false
+		align = isRtl ? 'end' : 'start'
+	} else {
+		// autosize is fine
+		w = Math.max(rawSize.w, 10)
+		h = Math.max(rawSize.h, 10)
+		autoSize = true
+	}
+
+	if (p.y - h / 2 < editor.getViewportPageBounds().minY + 40) {
+		p.y = editor.getViewportPageBounds().minY + 40 + h / 2
+	}
+
+	const newPoint = maybeSnapToGrid(new Vec(p.x - w / 2, p.y - h / 2), editor)
+	const shapeId = createShapeId()
+
+	// Allow this to trigger the max shapes reached alert
+	editor.createShapes([
+		{
+			id: shapeId,
+			type: 'text',
+			x: newPoint.x,
+			y: newPoint.y,
+			props: {
+				richText: richTextToPaste,
+				// if the text has more than one line, align it to the left
+				textAlign: align,
+				autoSize,
+				w,
+			},
+		},
+	])
+}
+
+/** @public */
+export async function defaultHandleExternalUrlContent(
+	editor: Editor,
+	{ point, url }: { point?: VecLike; url: string },
+	{ toasts, msg }: TLDefaultExternalContentHandlerOpts
+) {
+	// try to paste as an embed first
+	const embedUtil = editor.getShapeUtil('embed') as EmbedShapeUtil | undefined
+	const embedInfo = embedUtil?.getEmbedDefinition(url)
+
+	if (embedInfo && embedInfo.definition.embedOnPaste !== false) {
+		return editor.putExternalContent({
+			type: 'embed',
+			url: embedInfo.url,
+			point,
+			embed: embedInfo.definition,
+		})
+	}
+
+	const position =
+		point ??
+		(editor.inputs.getShiftKey()
+			? editor.inputs.getCurrentPagePoint()
+			: editor.getViewportPageBounds().center)
+
+	// Use the new function to create the bookmark
+	const result = await createBookmarkFromUrl(editor, { url, center: position })
+
+	if (!result.ok) {
+		toasts.addToast({
+			title: msg('assets.url.failed'),
+			severity: 'error',
+		})
+		return
+	}
+}
+
+/** @public */
+export async function defaultHandleExternalTldrawContent(
+	editor: Editor,
+	{ point, content }: { point?: VecLike; content: TLContent }
+) {
+	editor.run(() => {
+		const selectionBoundsBefore = editor.getSelectionPageBounds()
+		editor.markHistoryStoppingPoint('paste')
+
+		// Unlock any locked root shapes on paste
+		for (const shape of content.shapes) {
+			if (content.rootShapeIds.includes(shape.id)) {
+				shape.isLocked = false
+			}
+		}
+
+		editor.putContentOntoCurrentPage(content, {
+			point: point,
+			select: true,
+		})
+		const selectedBoundsAfter = editor.getSelectionPageBounds()
+		if (
+			selectionBoundsBefore &&
+			selectedBoundsAfter &&
+			selectionBoundsBefore?.collides(selectedBoundsAfter)
+		) {
+			// Creates a 'puff' to show content has been pasted
+			editor.updateInstanceState({ isChangingStyle: true })
+			editor.timers.setTimeout(() => {
+				editor.updateInstanceState({ isChangingStyle: false })
+			}, 150)
+		}
+	})
+}
+
+/** @public */
+export async function defaultHandleExternalExcalidrawContent(
+	editor: Editor,
+	{ point, content }: { point?: VecLike; content: any }
+) {
+	editor.run(() => {
+		putExcalidrawContent(editor, content, point)
+	})
+}
+
+/**
+ * A helper function for an external content handler. It creates bookmarks,
+ * images or video shapes corresponding to the type of assets provided.
+ *
+ * @param editor - The editor instance
+ *
+ * @param assets - An array of asset Ids
+ *
+ * @param position - the position at which to create the shapes
+ *
+ * @public
+ */
+export async function createShapesForAssets(
+	editor: Editor,
+	assets: TLAsset[],
+	position: VecLike
+): Promise<TLShapeId[]> {
+	if (!assets.length) return []
+
+	const currentPoint = Vec.From(position)
+	const partials: TLShapePartial[] = []
+
+	for (let i = 0; i < assets.length; i++) {
+		const asset = assets[i]
+		const shapeUtil = editor.getShapeUtilForAssetType(asset.type)
+		const partial = shapeUtil?.createShapeForAsset?.(asset, currentPoint) ?? null
+		if (partial) {
+			partials.push(partial)
+			if ('w' in asset.props && typeof asset.props.w === 'number') {
+				currentPoint.x += asset.props.w
+			}
+		}
+	}
+
+	editor.run(() => {
+		// Create any assets
+		const assetsToCreate = assets.filter((asset) => !editor.getAsset(asset.id))
+
+		editor.store.atomic(() => {
+			if (editor.canCreateShapes(partials)) {
+				if (assetsToCreate.length) {
+					editor.createAssets(assetsToCreate)
+				}
+
+				// Create the shapes
+				editor.createShapes(partials).select(...partials.map((p) => p.id))
+
+				// Re-position shapes so that the center of the group is at the provided point
+				centerSelectionAroundPoint(editor, position)
+			}
+		})
+	})
+
+	return partials.map((p) => p.id)
+}
+
+/**
+ * Repositions selected shapes do that the center of the group is
+ * at the provided position
+ *
+ * @param editor - The editor instance
+ *
+ * @param position - the point to center the shapes around
+ *
+ * @public
+ */
+export function centerSelectionAroundPoint(editor: Editor, position: VecLike) {
+	// Re-position shapes so that the center of the group is at the provided point
+	const viewportPageBounds = editor.getViewportPageBounds()
+	let selectionPageBounds = editor.getSelectionPageBounds()
+
+	if (selectionPageBounds) {
+		const offset = selectionPageBounds!.center.sub(position)
+
+		editor.updateShapes(
+			editor.getSelectedShapes().map((shape) => {
+				const localRotation = editor.getShapeParentTransform(shape).decompose().rotation
+				const localDelta = Vec.Rot(offset, -localRotation)
+				return {
+					id: shape.id,
+					type: shape.type,
+					x: shape.x! - localDelta.x,
+					y: shape.y! - localDelta.y,
+				}
+			})
+		)
+	}
+	selectionPageBounds = editor.getSelectionPageBounds()
+	// align selection with the grid if necessary
+	if (selectionPageBounds && editor.getInstanceState().isGridMode) {
+		const gridSize = editor.getDocumentSettings().gridSize
+		const topLeft = new Vec(selectionPageBounds.minX, selectionPageBounds.minY)
+		const gridSnappedPoint = topLeft.clone().snapToGrid(gridSize)
+		const delta = Vec.Sub(topLeft, gridSnappedPoint)
+		editor.updateShapes(
+			editor.getSelectedShapes().map((shape) => {
+				const newPoint = { x: shape.x! - delta.x, y: shape.y! - delta.y }
+				return {
+					id: shape.id,
+					type: shape.type,
+					x: newPoint.x,
+					y: newPoint.y,
+				}
+			})
+		)
+	}
+	// Zoom out to fit the shapes, if necessary
+	selectionPageBounds = editor.getSelectionPageBounds()
+	if (selectionPageBounds && !viewportPageBounds.contains(selectionPageBounds)) {
+		editor.zoomToSelection({ animation: { duration: editor.options.animationMediumMs } })
+	}
+}
+
+/** @public */
+export function createEmptyBookmarkShape(
+	editor: Editor,
+	url: string,
+	position: VecLike
+): TLBookmarkShape {
+	const partial: TLShapePartial = {
+		id: createShapeId(),
+		type: 'bookmark',
+		x: position.x - 150,
+		y: position.y - 160,
+		opacity: 1,
+		props: {
+			assetId: null,
+			url,
+		},
+	}
+
+	editor.run(() => {
+		// Allow this to trigger the max shapes reached alert
+		editor.createShape(partial)
+		if (!editor.getShape(partial.id)) return
+		editor.select(partial.id)
+		centerSelectionAroundPoint(editor, position)
+	})
+
+	return editor.getShape(partial.id) as TLBookmarkShape
+}
+
+async function maybeSanitizeSvgFile(file: File): Promise<File | null> {
+	if (file.type !== 'image/svg+xml') return file
+	try {
+		const text = await file.text()
+		const { sanitizeSvg } = await import('./utils/svg/sanitizeSvg')
+		const sanitized = sanitizeSvg(text)
+		if (!sanitized) return null
+		return new File([sanitized], file.name, { type: file.type, lastModified: file.lastModified })
+	} catch {
+		return null
+	}
+}
+
+/**
+ * Checks if a file is allowed to be uploaded. If it is not, it will show a toast explaining why to the user.
+ *
+ * @param editor - The editor instance
+ * @param file - The file to check
+ * @param options - The options for the external content handler
+ * @returns True if the file is allowed, false otherwise
+ * @public
+ */
+export function notifyIfFileNotAllowed(
+	editor: Editor,
+	file: File,
+	options: TLDefaultExternalContentHandlerOpts
+) {
+	const {
+		maxAssetSize = DEFAULT_MAX_ASSET_SIZE,
+		acceptedImageMimeTypes,
+		acceptedVideoMimeTypes,
+		toasts,
+		msg,
+	} = options
+
+	// Allow if any registered asset util accepts the MIME type, or if it matches
+	// an explicit allow-list. The asset-util branch lets custom AssetUtils
+	// (e.g. for PDFs) extend the default media handling — without it, files
+	// registered via `assetUtils` would be rejected because <Tldraw> forwards
+	// `DEFAULT_SUPPORTED_IMAGE_TYPES` / `DEFAULT_SUPPORT_VIDEO_TYPES` here, and
+	// custom MIME types aren't in those lists. The explicit-list branch supports
+	// callers that pass these props directly to restrict allowed types.
+	const isFileTypeAllowed =
+		!!editor.getAssetUtilForMimeType(file.type) ||
+		(acceptedImageMimeTypes?.includes(file.type) ?? false) ||
+		(acceptedVideoMimeTypes?.includes(file.type) ?? false)
+	if (!isFileTypeAllowed) {
+		toasts.addToast({
+			title: msg('assets.files.type-not-allowed'),
+			severity: 'error',
+		})
+		return false
+	}
+
+	if (file.size > maxAssetSize) {
+		const formatBytes = (bytes: number): string => {
+			if (bytes === 0) return '0 bytes'
+
+			const units = ['bytes', 'KB', 'MB', 'GB', 'TB', 'PB']
+			const base = 1024
+			const unitIndex = Math.floor(Math.log(bytes) / Math.log(base))
+
+			const value = bytes / Math.pow(base, unitIndex)
+			const formatted = value % 1 === 0 ? value.toString() : value.toFixed(1)
+
+			return `${formatted} ${units[unitIndex]}`
+		}
+
+		toasts.addToast({
+			title: msg('assets.files.size-too-big'),
+			description: msg('assets.files.maximum-size').replace('{size}', formatBytes(maxAssetSize)),
+			severity: 'error',
+		})
+		return false
+	}
+
+	// Use mime type instead of file ext, this is because
+	// window.navigator.clipboard does not preserve file names
+	// of copied files.
+	if (!file.type) {
+		toasts.addToast({
+			title: msg('assets.files.upload-failed'),
+			severity: 'error',
+		})
+		console.error('No mime type')
+		return false
+	}
+
+	return true
+}
+
+/** @public */
+export async function getAssetInfo(editor: Editor, file: File, assetId?: TLAssetId) {
+	if (!assetId) {
+		const hash = getHashForBuffer(await file.arrayBuffer())
+		assetId = AssetRecordType.createId(hash)
+	}
+
+	const assetUtil = editor.getAssetUtilForMimeType(file.type)
+	if (!assetUtil) return null
+
+	return await assetUtil.getAssetFromFile(file, assetId)
+}

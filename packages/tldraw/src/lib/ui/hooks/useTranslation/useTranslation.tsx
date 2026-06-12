@@ -1,0 +1,147 @@
+import { warnOnce } from '@tldraw/editor'
+import * as React from 'react'
+import { useAssetUrls } from '../../context/asset-urls'
+import { DEFAULT_TRANSLATION } from './defaultTranslation'
+import { TLUiTranslationKey } from './TLUiTranslationKey'
+import { TLUiTranslation, fetchTranslation } from './translations'
+
+/** @public */
+export interface TLUiTranslationProviderProps {
+	children: React.ReactNode
+	locale: string
+	/**
+	 * A collection of overrides different locales.
+	 *
+	 * @example
+	 *
+	 * ```ts
+	 * <TranslationProvider overrides={{ en: { 'style-panel.styles': 'Properties' } }} />
+	 * ```
+	 */
+	overrides?: Record<string, Record<string, string>>
+}
+
+/** @public */
+export type TLUiTranslationContextType = TLUiTranslation
+
+/** @internal */
+export const TranslationsContext = React.createContext<TLUiTranslationContextType | null>(null)
+
+/** @public */
+export function useCurrentTranslation() {
+	const translations = React.useContext(TranslationsContext)
+	if (!translations) {
+		throw new Error('useCurrentTranslation must be used inside of <TldrawUiContextProvider />')
+	}
+	return translations
+}
+
+/**
+ * Provides a translation context to the editor. Wrap this around components that use
+ * `useTranslation` (such as `TldrawSelectionForeground`) when you don't want to use the
+ * full `TldrawUiContextProvider`. Must be rendered inside an `AssetUrlsProvider`.
+ *
+ * @public @react
+ */
+export function TldrawUiTranslationProvider({
+	overrides,
+	locale,
+	children,
+}: TLUiTranslationProviderProps) {
+	const getAssetUrl = useAssetUrls()
+
+	const [currentTranslation, setCurrentTranslation] = React.useState<TLUiTranslation>(() => {
+		if (overrides && overrides['en']) {
+			return {
+				locale: 'en',
+				label: 'English',
+				dir: 'ltr',
+				messages: { ...DEFAULT_TRANSLATION, ...overrides['en'] },
+			}
+		}
+
+		return {
+			locale: 'en',
+			label: 'English',
+			dir: 'ltr',
+			messages: DEFAULT_TRANSLATION,
+		}
+	})
+
+	React.useEffect(() => {
+		let isCancelled = false
+
+		async function loadTranslation() {
+			const translation = await fetchTranslation(locale, getAssetUrl)
+
+			if (translation && !isCancelled) {
+				if (overrides && overrides[locale]) {
+					setCurrentTranslation({
+						...translation,
+						messages: { ...translation.messages, ...overrides[locale] },
+					})
+				} else {
+					setCurrentTranslation(translation)
+				}
+			}
+		}
+
+		loadTranslation()
+
+		return () => {
+			isCancelled = true
+		}
+	}, [getAssetUrl, locale, overrides])
+
+	return (
+		<TranslationsContext.Provider value={currentTranslation}>
+			{children}
+		</TranslationsContext.Provider>
+	)
+}
+
+/**
+ * Returns a function to translate a translation key into a string based on the current translation.
+ *
+ * @example
+ *
+ * ```ts
+ * const msg = useTranslation()
+ * const label = msg('style-panel.styles')
+ * ```
+ *
+ * @public
+ */
+export function useTranslation() {
+	const translation = React.useContext(TranslationsContext)
+	const messages = translation?.messages ?? DEFAULT_TRANSLATION
+
+	React.useEffect(() => {
+		if (!translation?.messages) {
+			warnOnce(
+				'No translation messages found, falling back to default translation. Wrap your app in <TldrawUiContextProvider>, or in both <AssetUrlsProvider> and <TldrawUiTranslationProvider>, to provide translations.'
+			)
+		}
+	}, [translation?.messages])
+
+	return React.useCallback(
+		function msg(id?: Exclude<string, TLUiTranslationKey> | string) {
+			return messages[id as TLUiTranslationKey] ?? id
+		},
+		[messages]
+	)
+}
+
+/**
+ * Returns the current text direction ('ltr' or 'rtl') based on the current translation.
+ *
+ * @public
+ */
+export function useDirection() {
+	const translation = useCurrentTranslation()
+	return translation.dir
+}
+
+export function untranslated(string: string) {
+	return string as TLUiTranslationKey
+}

@@ -1,0 +1,203 @@
+import fs from 'fs'
+import { setupClerkTestingToken } from '@clerk/testing/playwright'
+import { test as base, expect } from '@playwright/test'
+import { OTHER_USERS, USERS } from '../consts'
+import { Database } from './Database'
+import { DeleteFileDialog } from './DeleteFileDialog'
+import { Editor } from './Editor'
+import { GroupInviteDialog } from './GroupInviteDialog'
+import { getStorageStateFileName } from './helpers'
+import { HomePage } from './HomePage'
+import { ImportHelper } from './ImportHelper'
+import { ShareMenu } from './ShareMenu'
+import { Sidebar } from './Sidebar'
+import { SignInDialog } from './SignInDialog'
+
+interface TlaFixtures {
+	homePage: HomePage
+	editor: Editor
+	sidebar: Sidebar
+	shareMenu: ShareMenu
+	database: Database
+	deleteFileDialog: DeleteFileDialog
+	groupInviteDialog: GroupInviteDialog
+	signInDialog: SignInDialog
+	importHelper: ImportHelper
+	setupAndCleanup: void
+	retry(fn: () => Promise<void>): Promise<void>
+}
+
+interface TlaWorkerFixtures {
+	workerStorageState: string
+}
+
+export const test = base.extend<TlaFixtures, TlaWorkerFixtures>({
+	sidebar: async ({ page }, testUse) => {
+		await testUse(new Sidebar(page))
+	},
+	editor: async ({ page, sidebar }, testUse) => {
+		await testUse(new Editor(page, sidebar))
+	},
+	homePage: async ({ page, editor }, testUse) => {
+		await testUse(new HomePage(page, editor))
+	},
+	database: async ({ page }, testUse) => {
+		await testUse(new Database(page, test.info().parallelIndex))
+	},
+	shareMenu: async ({ page }, testUse) => {
+		await testUse(new ShareMenu(page))
+	},
+	deleteFileDialog: async ({ page }, testUse) => {
+		await testUse(new DeleteFileDialog(page))
+	},
+	groupInviteDialog: async ({ page }, testUse) => {
+		await testUse(new GroupInviteDialog(page))
+	},
+	signInDialog: async ({ page }, testUse) => {
+		await testUse(new SignInDialog(page))
+	},
+	importHelper: async ({ page }, testUse) => {
+		await testUse(new ImportHelper(page))
+	},
+	// This is an auto fixture which makes sure that we are on the home page when the test starts
+	// and that we clean up when the tests completes
+	setupAndCleanup: [
+		async ({ page, homePage, database }, testUse) => {
+			// All the code before testUse is run before each test
+
+			// Make sure we don't get marked as a bot
+			// https://clerk.com/docs/testing/playwright/overview
+			await setupClerkTestingToken({ page })
+			await database.reset()
+
+			await homePage.goto()
+			await homePage.isLoaded()
+
+			await testUse()
+		},
+		{ auto: true },
+	],
+	storageState: ({ workerStorageState }, testUse) => testUse(workerStorageState),
+	workerStorageState: [
+		async ({ browser }, testUse) => {
+			const id = test.info().parallelIndex
+
+			const fileName = getStorageStateFileName(id, 'huppy')
+			if (fs.existsSync(fileName)) {
+				// Reuse existing authentication state if any.
+				await testUse(fileName)
+				return
+			}
+			for (const user of ['huppy' as const, 'suppy' as const]) {
+				const fileName = getStorageStateFileName(id, user)
+				// Important: make sure we authenticate in a clean environment by unsetting storage state.
+				const page = await browser.newPage({ storageState: undefined })
+				let email: string
+				if (user === 'huppy') {
+					email = USERS[id]
+				} else {
+					email = OTHER_USERS[id]
+				}
+				const sidebar = new Sidebar(page)
+				const editor = new Editor(page, sidebar)
+				const homePage = new HomePage(page, editor)
+				await homePage.loginAs(email)
+				await expect(page.getByTestId('tla-sidebar-layout')).toBeVisible()
+
+				await page.context().storageState({ path: fileName })
+				await page.close()
+			}
+			await testUse(fileName)
+		},
+		{ scope: 'worker' },
+	],
+})
+
+export { expect } from '@playwright/test'
+
+/** Stage 3 / TS 5.2+ method decorator context (subset; avoids coupling to a specific TS lib version). */
+interface StepMethodDecoratorContext {
+	kind: 'method'
+	name: string | symbol
+}
+
+function isStage3MethodDecoratorContext(value: unknown): value is StepMethodDecoratorContext {
+	return (
+		typeof value === 'object' &&
+		value !== null &&
+		'kind' in value &&
+		(value as StepMethodDecoratorContext).kind === 'method'
+	)
+}
+
+/** Legacy method decorator (`experimentalDecorators`). */
+export function step<T extends (...args: any[]) => any>(
+	target: object,
+	propertyKey: string | symbol,
+	descriptor: TypedPropertyDescriptor<T>
+): TypedPropertyDescriptor<T>
+/** Stage 3 method decorator (e.g. Node `--no-strip-types`). */
+export function step<T extends (...args: any[]) => any>(
+	originalMethod: T,
+	context: StepMethodDecoratorContext
+): T
+/**
+ * Wraps page-object methods in `test.step` for clearer Playwright reports.
+ * Supports both legacy (`experimentalDecorators`) and Stage 3 method decorators
+ * (e.g. when tests run under Node's `--no-strip-types` + modern emit).
+ */
+export function step(
+	target: object | ((...args: any[]) => any),
+	propertyKeyOrContext: string | symbol | StepMethodDecoratorContext,
+	descriptor?: TypedPropertyDescriptor<(...args: any[]) => any>
+): any {
+	if (
+		descriptor === undefined &&
+		isStage3MethodDecoratorContext(propertyKeyOrContext) &&
+		typeof target === 'function'
+	) {
+		const original = target as (...args: any[]) => any
+		const ctx = propertyKeyOrContext
+		const key = typeof ctx.name === 'string' ? ctx.name : String(ctx.name)
+		return async function (this: object, ...args: any[]) {
+			return await test.step(`${(this as { constructor: { name: string } }).constructor.name}.${key}`, async () => {
+				return original.apply(this, args)
+			})
+		}
+	}
+
+	if (!descriptor?.value) {
+		throw new Error(
+			'step: expected a legacy method decorator with descriptor.value, or a Stage 3 method decorator'
+		)
+	}
+
+	const propertyKey = propertyKeyOrContext as string
+	const original = descriptor.value
+	descriptor.value = async function (this: object, ...args: any[]) {
+		return await test.step(`${(this as { constructor: { name: string } }).constructor.name}.${String(propertyKey)}`, async () => {
+			return original.apply(this, args)
+		})
+	}
+	return descriptor
+}
+
+export function repeatTest(
+	name: string,
+	fn: (...args: any) => Promise<void>,
+	{ times = 5, only = false } = {}
+) {
+	const getName = (i: number) => `${name} (${i + 1} of ${times})`
+	for (let i = 0; i < times; i++) {
+		if (only) {
+			// eslint-disable-next-line tldraw/no-focused-tests
+			test.only(getName(i), fn)
+		} else {
+			test(getName(i), fn)
+		}
+	}
+	return
+}
+
+repeatTest.only = (name: string, fn: (...args: any) => Promise<void>, { times = 5 } = {}) =>
+	repeatTest(name, fn, { times, only: true })

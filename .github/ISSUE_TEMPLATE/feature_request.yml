@@ -1,0 +1,27 @@
+name: Feature request
+description: Suggest a new feature or improvement
+type: Feature
+labels: []
+assignees: []
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Have an idea for a feature or improvement in tldraw? We'd love to hear it!
+  - type: textarea
+    id: description
+    attributes:
+      label: What's the feature?
+      description: Describe the feature, the problem it solves, and any examples from other apps.
+    validations:
+      required: true
+  - type: dropdown
+    id: product
+    attributes:
+      label: Where would you like this feature?
+      options:
+        - tldraw SDK (@tldraw/tldraw npm package)
+        - tldraw.com
+        - makereal.tldraw.com
+    validations:
+      required: false

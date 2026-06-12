@@ -1,0 +1,27 @@
+import { Locator, Page } from '@playwright/test'
+
+export class PageMenu {
+	readonly pagemenuButton: Locator
+	readonly header: Locator
+	readonly createButton: Locator
+	readonly pageList: Locator
+	readonly pageItems: Locator
+
+	constructor(public readonly page: Page) {
+		this.page = page
+		this.pagemenuButton = this.page.getByTestId('page-menu.button')
+		// The popover no longer has a title row — use the list as the "is the menu open" anchor.
+		this.header = this.page.getByTestId('page-menu.list')
+		this.createButton = this.page.getByTestId('page-menu.create')
+		this.pageList = this.page.getByTestId('page-menu.list')
+		this.pageItems = this.page.getByTestId('page-menu.item')
+	}
+
+	async getPageItem(index: number) {
+		return this.pageItems.nth(index)
+	}
+
+	getPageItemByName(name: string) {
+		return this.page.getByTestId('page-menu.item').filter({ hasText: name })
+	}
+}

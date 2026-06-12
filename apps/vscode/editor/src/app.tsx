@@ -1,0 +1,153 @@
+import { getAssetUrlsByImport } from '@tldraw/assets/imports'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import {
+	DefaultMainMenu,
+	DefaultSpinner,
+	EditSubmenu,
+	Editor,
+	ErrorBoundary,
+	ExportFileContentSubMenu,
+	ExtrasGroup,
+	PreferencesGroup,
+	TLComponents,
+	Tldraw,
+	ViewSubmenu,
+	hardReset,
+	setRuntimeOverrides,
+} from 'tldraw'
+import 'tldraw/tldraw.css'
+import { VscodeMessage } from '../../messages'
+import '../public/index.css'
+import { ChangeResponder } from './ChangeResponder'
+import { FileOpen } from './FileOpen'
+import { FullPageMessage } from './FullPageMessage'
+import { Links } from './Links'
+import { onCreateAssetFromUrl } from './utils/bookmarks'
+import { registerExternalUrlContentHandler } from './utils/externalUrlContentHandler'
+import { vscode } from './utils/vscode'
+
+setRuntimeOverrides({
+	openWindow: (url, target) => {
+		if (url.includes('utm_campaign=watermark')) {
+			url = url.replace('utm_source=sdk', 'utm_source=extension')
+		}
+		vscode.postMessage({
+			type: 'vscode:open-window',
+			data: {
+				url,
+				target,
+			},
+		})
+	},
+	refreshPage: () => {
+		vscode.postMessage({
+			type: 'vscode:refresh-page',
+		})
+	},
+	hardReset: async () => {
+		await hardReset({ shouldReload: false })
+		vscode.postMessage({
+			type: 'vscode:hard-reset',
+		})
+	},
+})
+
+const handleError = (error: any) => {
+	console.error(error.message)
+}
+
+export function WrappedTldrawEditor() {
+	return (
+		<div className="tldraw--editor">
+			<ErrorBoundary
+				fallback={() => <FullPageMessage>Fallback</FullPageMessage>}
+				onError={handleError}
+			>
+				<TldrawWrapper />
+			</ErrorBoundary>
+		</div>
+	)
+}
+
+export function TldrawWrapper() {
+	const [tldrawInnerProps, setTldrawInnerProps] = useState<TLDrawInnerProps | null>(null)
+
+	useEffect(() => {
+		function handleMessage({ data: message }: MessageEvent<VscodeMessage>) {
+			switch (message.type) {
+				case 'vscode:opened-file': {
+					setTldrawInnerProps({
+						assetSrc: message.data.assetSrc,
+						fileContents: message.data.fileContents,
+						uri: message.data.uri,
+						isDarkMode: message.data.isDarkMode,
+					})
+					// We only want to listen for this message once
+					window.removeEventListener('message', handleMessage)
+					break
+				}
+			}
+		}
+
+		window.addEventListener('message', handleMessage)
+
+		vscode.postMessage({ type: 'vscode:ready-to-receive-file' })
+
+		return () => {
+			window.removeEventListener('message', handleMessage)
+		}
+	}, [setTldrawInnerProps])
+
+	return tldrawInnerProps === null ? (
+		<FullPageMessage>
+			<DefaultSpinner />
+		</FullPageMessage>
+	) : (
+		<TldrawInner {...tldrawInnerProps} />
+	)
+}
+
+export interface TLDrawInnerProps {
+	assetSrc: string
+	fileContents: string
+	uri: string
+	isDarkMode: boolean
+}
+
+const components: TLComponents = {
+	MainMenu: () => (
+		<DefaultMainMenu>
+			<EditSubmenu />
+			<ViewSubmenu />
+			<ExportFileContentSubMenu />
+			<ExtrasGroup />
+			<PreferencesGroup />
+			<Links />
+		</DefaultMainMenu>
+	),
+}
+function TldrawInner({ uri, assetSrc, isDarkMode, fileContents }: TLDrawInnerProps) {
+	const assetUrls = useMemo(() => getAssetUrlsByImport({ baseUrl: assetSrc }), [assetSrc])
+
+	const handleMount = useCallback((editor: Editor) => {
+		editor.registerExternalAssetHandler('url', onCreateAssetFromUrl)
+		registerExternalUrlContentHandler(editor)
+	}, [])
+
+	const licenseKey =
+		'tldraw-tldraw-2027-05-22/WyJDOEVmdnNlQyIsWyJ2c2NvZGUtd2VidmlldzpcXC9cXC8uKnRsZHJhdy1vcmdcXC50bGRyYXctdnNjb2RlIl0sNDEsIjIwMjctMDUtMjIiXQ.s/4f2jMqZhK2eAHT0LjZZ48NAcrsZ7UdWMerUzQ6q8SZtpkMmuv3JoPviFo+xkfNxD4eaGTGWgHIYyX1VCbwXg'
+	return (
+		<Tldraw
+			assetUrls={assetUrls}
+			persistenceKey={uri}
+			onMount={handleMount}
+			components={components}
+			licenseKey={licenseKey}
+		>
+			{/* <DarkModeHandler themeKind={themeKind} /> */}
+
+			<FileOpen fileContents={fileContents} forceDarkMode={isDarkMode} />
+			<ChangeResponder />
+		</Tldraw>
+	)
+}

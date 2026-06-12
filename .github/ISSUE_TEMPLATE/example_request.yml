@@ -1,0 +1,16 @@
+name: Example request
+description: Submit a request for an example
+labels: []
+assignees: []
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Need an example of how to do something with tldraw? We're happy to help!
+  - type: textarea
+    id: description
+    attributes:
+      label: What's the example?
+      description: Describe the example or the use case you'd like to see demonstrated.
+    validations:
+      required: true

@@ -1,0 +1,109 @@
+---
+title: Persistence
+status: published
+author: steveruizok
+date: 3/22/2023
+order: 4
+keywords:
+  - data
+  - sync
+  - persistence
+  - database
+  - indexeddb
+  - localstorage
+---
+
+Persistence means storing the editor's state to a database and restoring it later. The tldraw SDK provides several approaches: automatic local persistence with a single prop, manual snapshots for custom storage backends, and a migration system for handling schema changes.
+
+## Local persistence
+
+The simplest approach is the `persistenceKey` prop. This automatically saves to IndexedDB and syncs across browser tabs:
+
+```tsx
+import { Tldraw } from 'tldraw'
+import 'tldraw/tldraw.css'
+
+export default function App() {
+	return (
+		<div style={{ position: 'fixed', inset: 0 }}>
+			<Tldraw persistenceKey="my-document" />
+		</div>
+	)
+}
+```
+
+Each unique key represents a separate document. Two editors with the same key share the same document and stay synchronized.
+
+## Snapshots
+
+For custom storage backends, use [getSnapshot](?) and [loadSnapshot](?) to save and restore editor state as JSON:
+
+```tsx
+import { getSnapshot, loadSnapshot } from 'tldraw'
+
+// Save
+const { document, session } = getSnapshot(editor.store)
+await saveToDatabase(document)
+
+// Load
+const document = await loadFromDatabase()
+loadSnapshot(editor.store, { document })
+```
+
+The snapshot has two parts: `document` (shapes, pages, bindings) which you typically save to a server, and `session` (camera, selection, UI state) which you keep per-user locally.
+
+See [Persistence](/sdk-features/persistence) for complete coverage of snapshots, async loading with `TLStoreWithStatus`, and auto-save patterns.
+
+## The store
+
+The editor's [store](/sdk-features/store) is a reactive database that holds all records. You can create a standalone store, load data into it, and pass it to the editor:
+
+```tsx
+import { useState } from 'react'
+import { createTLStore, loadSnapshot, Tldraw } from 'tldraw'
+
+export default function App() {
+	const [store] = useState(() => {
+		const store = createTLStore()
+		const saved = localStorage.getItem('my-drawing')
+		if (saved) {
+			loadSnapshot(store, JSON.parse(saved))
+		}
+		return store
+	})
+
+	return <Tldraw store={store} />
+}
+```
+
+See [Store](/sdk-features/store) for details on store operations, listening to changes, queries, and transactions.
+
+## Multiplayer sync
+
+For real-time collaboration, use the `@tldraw/sync` package. Multiple users can edit the same document simultaneously, see each other's cursors, and follow each other's viewports:
+
+```tsx
+import { useSyncDemo } from '@tldraw/sync'
+import { Tldraw } from 'tldraw'
+
+export default function App() {
+	const store = useSyncDemo({ roomId: 'my-room-id' })
+	return <Tldraw store={store} />
+}
+```
+
+See [Collaboration](/sdk-features/collaboration) for production setup, custom presence, authentication, and building custom sync solutions.
+
+## Migrations
+
+When you load a snapshot from an older schema version, the store migrates it automatically. For custom shapes, you can define migrations to handle changes to their props over time.
+
+See [Persistence](/sdk-features/persistence#migrations) for details on shape props migrations and general migrations.
+
+## Examples
+
+- [Persistence key](/examples/data/persistence-key) — Automatic local persistence with a single prop
+- [Snapshots](/examples/data/snapshots) — Saving and loading editor state
+- [Local storage](/examples/data/local-storage) — Custom persistence with throttled auto-save
+- [Store events](/examples/data/store-events) — Listening to store changes
+- [Shape with migrations](/examples/data/shape-with-migrations) — Migrations for custom shape props

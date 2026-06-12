@@ -1,0 +1,317 @@
+import * as github from '@actions/github'
+import { DeleteObjectsCommand, ListObjectsV2Command, S3Client } from '@aws-sdk/client-s3'
+import { exec } from './lib/exec'
+import { makeEnv } from './lib/makeEnv'
+import { nicelog } from './lib/nicelog'
+
+// Do not use `process.env` directly in this script. Add your variable to `makeEnv` and use it via
+// `env` instead. This makes sure that all required env vars are present.
+const env = makeEnv([
+	'CLOUDFLARE_ACCOUNT_ID',
+	'CLOUDFLARE_API_TOKEN',
+	'GH_TOKEN',
+	'SUPABASE_ACCESS_TOKEN',
+	'SUPABASE_PREVIEW_PROJECT_ID',
+	'ZERO_R2_ENDPOINT',
+	'ZERO_R2_BUCKET_NAME',
+	'ZERO_R2_ACCESS_KEY_ID',
+	'ZERO_R2_SECRET_ACCESS_KEY',
+	'R2_ACCESS_KEY_ID',
+	'R2_ACCESS_KEY_SECRET',
+])
+
+interface ListWorkersResult {
+	success: boolean
+	result: { id: string }[]
+}
+
+const _isPrClosedCache = new Map<number, boolean>()
+async function isPrClosedForAWhile(prNumber: number) {
+	if (_isPrClosedCache.has(prNumber)) {
+		return _isPrClosedCache.get(prNumber)!
+	}
+
+	let prResult
+	try {
+		prResult = await github.getOctokit(env.GH_TOKEN).rest.pulls.get({
+			owner: 'tldraw',
+			repo: 'tldraw',
+			pull_number: prNumber,
+		})
+	} catch (err: any) {
+		if (err.status === 404) {
+			_isPrClosedCache.set(prNumber, true)
+			return true
+		}
+		throw err
+	}
+	const timeout = 1000 * 60 * 60 * 24 * 2 // two days
+	const result =
+		prResult.data.state === 'closed' &&
+		Date.now() - new Date(prResult.data.closed_at!).getTime() > timeout
+	_isPrClosedCache.set(prNumber, result)
+	return result
+}
+
+const CLOUDFLARE_WORKER_REGEX = /^pr-(\d+)-/
+const CLOUDFLARE_SYNC_WORKER_REGEX = /^pr-\d+-tldraw-multiplayer$/
+
+async function cloudflareApi(endpoint: string, options: RequestInit = {}): Promise<Response> {
+	const url = `https://api.cloudflare.com/client/v4/accounts/${env.CLOUDFLARE_ACCOUNT_ID}${endpoint}`
+	return fetch(url, {
+		...options,
+		headers: {
+			Authorization: `Bearer ${env.CLOUDFLARE_API_TOKEN}`,
+			'Content-Type': 'application/json',
+		},
+	})
+}
+
+async function listPreviewWorkerDeployments() {
+	const res = await cloudflareApi('/workers/scripts')
+	const data = (await res.json()) as ListWorkersResult
+	if (!data.success) {
+		throw new Error('Failed to list workers ' + JSON.stringify(data))
+	}
+	return (
+		data.result
+			.map((r) => r.id)
+			.filter((id) => id.match(CLOUDFLARE_WORKER_REGEX))
+			// Delete workers with service bindings to other workers first (image-optimizer and tldrawusercontent both bind to the sync worker)
+			.sort((a, b) => {
+				const aHasBinding = a.includes('image-optimizer') || a.includes('tldrawusercontent')
+				const bHasBinding = b.includes('image-optimizer') || b.includes('tldrawusercontent')
+				if (aHasBinding && !bHasBinding) return -1
+				if (!aHasBinding && bHasBinding) return 1
+				return 0
+			})
+	)
+}
+
+async function deleteQueue(queueName: string) {
+	nicelog('Deleting queue:', queueName)
+	await exec('npx', ['wrangler', 'queues', 'delete', queueName], {
+		env: { CI: '1' },
+	})
+}
+
+async function deleteQueueConsumer(queueName: string, scriptName: string) {
+	nicelog('Deleting queue consumer:', scriptName, 'from queue:', queueName)
+	await exec('npx', ['wrangler', 'queues', 'consumer', 'worker', 'remove', queueName, scriptName], {
+		env: { CI: '1' },
+	})
+}
+
+async function deletePreviewWorker(workerName: string) {
+	nicelog('Deleting worker:', workerName)
+	await exec('npx', ['wrangler', 'delete', '--name', workerName], {
+		env: { CI: '1' },
+	})
+}
+
+async function deletePreviewWorkerDeployment(id: string) {
+	// We want to delete the queue consumer and the queue only once. We'll do it just before we delete the worker
+	if (id.match(CLOUDFLARE_SYNC_WORKER_REGEX)) {
+		const prNumber = Number(id.match(CLOUDFLARE_WORKER_REGEX)?.[1])
+		const queueName = `tldraw-multiplayer-queue-pr-${prNumber}`
+
+		try {
+			await deleteQueueConsumer(queueName, id)
+		} catch (err) {
+			nicelog(`Failed to delete consumer ${id}: ${err}`)
+		}
+		await deletePreviewWorker(id)
+		try {
+			await deleteQueue(queueName)
+		} catch (err) {
+			nicelog(`Failed to delete queue ${queueName}: ${err}`)
+		}
+	} else {
+		await deletePreviewWorker(id)
+	}
+}
+
+const supabaseHeaders = {
+	Authorization: `Bearer ${env.SUPABASE_ACCESS_TOKEN}`,
+}
+
+async function deletePreviewDatabase(branchName: string) {
+	const branchId = _supabaseBranchCache.get(branchName)
+	if (!branchId) {
+		nicelog(`Branch ${branchName} not found in cache`)
+		return
+	}
+	const url = `https://api.supabase.com/v1/branches/${branchId}`
+	nicelog('DELETE', url)
+	const res = await fetch(url, { method: 'DELETE', headers: supabaseHeaders })
+	if (!res.ok) {
+		throw new Error(
+			`Failed to delete Supabase branch ${branchName}: ${res.status} ${res.statusText}`
+		)
+	}
+}
+
+async function deleteFlyioPreviewApp(appName: string) {
+	const result = await exec('flyctl', ['apps', 'list', '-o', 'tldraw-gb-ltd'])
+	if (result.indexOf(appName) >= 0) {
+		await exec('flyctl', ['apps', 'destroy', appName, '-y'])
+	}
+}
+
+const PREVIEW_DB_REGEX = /^pr-\d+$/
+const _supabaseBranchCache = new Map<string, string>()
+async function listPreviewDatabases() {
+	const url = `https://api.supabase.com/v1/projects/${env.SUPABASE_PREVIEW_PROJECT_ID}/branches`
+	const res = await fetch(url, { headers: supabaseHeaders })
+	if (!res.ok) {
+		throw new Error(`Failed to list Supabase branches: ${res.status} ${res.statusText}`)
+	}
+	const branches = (await res.json()) as { id: string; name: string }[]
+	const preview = branches.filter((b) => PREVIEW_DB_REGEX.test(b.name))
+	for (const b of preview) {
+		_supabaseBranchCache.set(b.name, b.id)
+	}
+	return preview.map((b) => b.name)
+}
+const ZERO_CACHE_APP_REGEX = /^pr-\d+-zero-(cache|rm|vs)$/
+async function listFlyioPreviewApps() {
+	// This is the kind of output this returns.
+	// We'll skip the first line then get the first column of each line.
+	// NAME                    OWNER           STATUS          LATEST DEPLOY
+	// pr-5795-zero-cache      tldraw-gb-ltd   deployed        39m37s ago
+	const result = await exec('flyctl', ['apps', 'list', '-o', 'tldraw-gb-ltd'])
+	const lines = result.trim().split('\n')
+	if (lines.length <= 1) return []
+
+	const appNames = lines.slice(1).map((line) => {
+		const [name] = line.trim().split(/\s+/)
+		return name
+	})
+
+	return appNames.filter((name) => ZERO_CACHE_APP_REGEX.test(name))
+}
+
+interface R2BucketRef {
+	client: S3Client
+	bucket: string
+	label: string
+}
+
+async function listR2PrPrefixes({ client, bucket }: R2BucketRef): Promise<string[]> {
+	const prefixes: string[] = []
+	let continuationToken: string | undefined
+	do {
+		const res = await client.send(
+			new ListObjectsV2Command({
+				Bucket: bucket,
+				Prefix: 'pr-',
+				Delimiter: '/',
+				ContinuationToken: continuationToken,
+			})
+		)
+		for (const prefix of res.CommonPrefixes ?? []) {
+			if (prefix.Prefix) prefixes.push(prefix.Prefix)
+		}
+		continuationToken = res.IsTruncated ? res.NextContinuationToken : undefined
+	} while (continuationToken)
+	return prefixes
+}
+
+async function deleteR2Prefix({ client, bucket, label }: R2BucketRef, prefix: string) {
+	nicelog(`Deleting ${label}:`, prefix)
+	while (true) {
+		const list = await client.send(new ListObjectsV2Command({ Bucket: bucket, Prefix: prefix }))
+		const objects = list.Contents
+		if (!objects || objects.length === 0) break
+		const result = await client.send(
+			new DeleteObjectsCommand({
+				Bucket: bucket,
+				Delete: { Objects: objects.map((o) => ({ Key: o.Key })) },
+			})
+		)
+		if (result.Errors && result.Errors.length > 0) {
+			throw new Error(
+				`Failed to delete ${result.Errors.length} objects: ${JSON.stringify(result.Errors)}`
+			)
+		}
+	}
+}
+
+const zeroBackups: R2BucketRef = {
+	client: new S3Client({
+		region: 'auto',
+		endpoint: env.ZERO_R2_ENDPOINT,
+		credentials: {
+			accessKeyId: env.ZERO_R2_ACCESS_KEY_ID,
+			secretAccessKey: env.ZERO_R2_SECRET_ACCESS_KEY,
+		},
+	}),
+	bucket: env.ZERO_R2_BUCKET_NAME,
+	label: 'Zero litestream backup',
+}
+
+// Matches the bucket / endpoint used by `coalesceWithPreviousAssets` in deploy-dotcom.ts.
+const dotcomAssetsCache: R2BucketRef = {
+	client: new S3Client({
+		region: 'auto',
+		endpoint: 'https://c34edc4e76350954b63adebde86d5eb1.r2.cloudflarestorage.com',
+		credentials: {
+			accessKeyId: env.R2_ACCESS_KEY_ID,
+			secretAccessKey: env.R2_ACCESS_KEY_SECRET,
+		},
+	}),
+	bucket: 'dotcom-deploy-assets-cache',
+	label: 'dotcom deploy assets cache',
+}
+
+const deletionErrors: string[] = []
+
+async function main() {
+	nicelog('Getting queues information')
+	await processItems(listPreviewWorkerDeployments, deletePreviewWorkerDeployment)
+	nicelog('\nPruning Supabase preview databases')
+	await processItems(listPreviewDatabases, deletePreviewDatabase)
+	nicelog('\nPruning fly.io preview apps')
+	await processItems(listFlyioPreviewApps, deleteFlyioPreviewApp)
+	for (const r2 of [zeroBackups, dotcomAssetsCache]) {
+		nicelog(`\nPruning ${r2.label}`)
+		await processItems(
+			() => listR2PrPrefixes(r2),
+			(prefix) => deleteR2Prefix(r2, prefix)
+		)
+	}
+	nicelog('\nDone')
+	if (deletionErrors.length > 0) {
+		nicelog('\nDeletion errors:')
+		for (const error of deletionErrors) {
+			nicelog(error)
+		}
+		process.exit(1)
+	}
+}
+
+async function processItems(
+	fetchFn: () => Promise<string[]>,
+	deleteFn: (id: string) => Promise<void>
+) {
+	const items = await fetchFn()
+	for (const item of items) {
+		const number = Number(item.match(/pr-(\d+)/)?.[1])
+		if (!number || isNaN(number)) {
+			nicelog(`Skipping ${item} because it doesn't match the regex`)
+			continue
+		}
+		if (await isPrClosedForAWhile(number)) {
+			nicelog(`Deleting ${item} because PR is closed`)
+			try {
+				await deleteFn(item)
+			} catch (err) {
+				deletionErrors.push(`${item}: ${err}`)
+			}
+		} else {
+			nicelog(`Skipping ${item} because PR is still open`)
+		}
+	}
+}
+
+main()

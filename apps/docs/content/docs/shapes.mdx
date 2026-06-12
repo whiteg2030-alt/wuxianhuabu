@@ -1,0 +1,120 @@
+---
+title: Shapes
+status: published
+author: steveruizok
+date: 3/22/2023
+order: 2
+keywords:
+  - custom
+  - shapes
+  - shapeutils
+  - utils
+---
+
+In tldraw, a shape is something that can exist on the page, like an arrow, an image, or some text. This article provides an overview of shapes and how to create custom ones.
+
+## Shape basics
+
+Shapes are JSON records stored in the editor's [store](/sdk-features/store). Each shape has base properties (position, rotation, opacity) plus a `props` object for shape-specific data. See [Shapes](/sdk-features/shapes) for the full shape system architecture.
+
+The [Tldraw](?) component includes [default shapes](/sdk-features/default-shapes) like geo, text, arrow, and draw. The only core shape (always present) is the [group](/sdk-features/groups).
+
+## ShapeUtil
+
+Each shape type has a [ShapeUtil](?) class that defines its behavior: how it renders, its geometry for hit testing, and how it responds to interactions. See [Shapes](/sdk-features/shapes#shapeutil) for details on ShapeUtil methods, lifecycle hooks, and configuration.
+
+## Custom shapes
+
+You can create your own shapes by defining a shape type and a ShapeUtil class.
+
+> For a working example, see our [custom shapes example](/examples/shapes/tools/custom-shape).
+
+### Defining the shape type
+
+Register your shape's props using TypeScript module augmentation:
+
+```ts
+const CARD_TYPE = 'card'
+
+declare module 'tldraw' {
+	export interface TLGlobalShapePropsMap {
+		[CARD_TYPE]: { w: number; h: number }
+	}
+}
+
+type CardShape = TLShape<typeof CARD_TYPE>
+```
+
+### Creating a ShapeUtil
+
+Implement the required methods: `getDefaultProps`, `getGeometry`, `component`, and `indicator`:
+
+```tsx
+import { HTMLContainer, Rectangle2d, ShapeUtil } from 'tldraw'
+
+class CardShapeUtil extends ShapeUtil<CardShape> {
+	static override type = CARD_TYPE
+
+	getDefaultProps(): CardShape['props'] {
+		return { w: 100, h: 100 }
+	}
+
+	getGeometry(shape: CardShape) {
+		return new Rectangle2d({
+			width: shape.props.w,
+			height: shape.props.h,
+			isFilled: true,
+		})
+	}
+
+	component(shape: CardShape) {
+		return <HTMLContainer>Hello</HTMLContainer>
+	}
+
+	getIndicatorPath(shape: CardShape) {
+		const path = new Path2D()
+		path.rect(0, 0, shape.props.w, shape.props.h)
+		return path
+	}
+}
+```
+
+See [Geometry](/sdk-features/geometry) for available geometry classes.
+
+### Registering your shape
+
+Pass your ShapeUtil to the [Tldraw](?) component:
+
+```tsx
+export default function () {
+	return (
+		<div style={{ position: 'fixed', inset: 0 }}>
+			<Tldraw
+				shapeUtils={[CardShapeUtil]}
+				onMount={(editor) => {
+					editor.createShape({ type: 'card' })
+				}}
+			/>
+		</div>
+	)
+}
+```
+
+## Extending shapes
+
+- **[BaseBoxShapeUtil](?)** - Extend this for standard rectangular shape behavior
+- **[ShapeUtil#configure](?)** - Customize built-in shapes without subclassing
+
+## Related topics
+
+| Topic                                          | Description                                                        |
+| ---------------------------------------------- | ------------------------------------------------------------------ |
+| [Shapes](/sdk-features/shapes)                 | Full shape system architecture, ShapeUtil methods, lifecycle hooks |
+| [Default shapes](/sdk-features/default-shapes) | Built-in shape types and their properties                          |
+| [Geometry](/sdk-features/geometry)             | Geometry classes for hit testing and bounds                        |
+| [Bindings](/sdk-features/bindings)             | Connecting shapes together (like arrows)                           |
+| [Rich text](/sdk-features/rich-text)           | Adding text labels to shapes                                       |
+| [Shape clipping](/sdk-features/shape-clipping) | Clipping children within shape boundaries                          |
+| [Snapping](/sdk-features/snapping)             | Shape snapping behavior                                            |
+| [Persistence](/sdk-features/persistence)       | Shape migrations and data persistence                              |
+| [Groups](/sdk-features/groups)                 | Grouping shapes together                                           |

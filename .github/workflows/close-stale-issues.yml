@@ -1,0 +1,34 @@
+name: Close inactive issues
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 0 1 * *'
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  close-issues:
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+      pull-requests: write
+    steps:
+      - uses: actions/stale@v10
+        with:
+          days-before-issue-stale: 150
+          days-before-issue-close: 30
+          stale-issue-label: 'stale'
+          stale-issue-message: >
+            This issue has been marked as stale because it has been open for 150 days with no activity.
+            If there's no further discussion, it'll be closed in 30 days time.
+            If you would like to ensure it stays open, you can comment on the issue and revive the discussion.
+            Or, you can add the 'keep' label to prevent it from being closed.
+          close-issue-message: 'This issue was closed because it has been inactive for 30 days since being marked as stale.'
+          close-issue-reason: 'not_planned'
+          days-before-pr-stale: -1
+          days-before-pr-close: -1
+          operations-per-run: 1000
+          exempt-issue-labels: keep
+          repo-token: ${{ secrets.GITHUB_TOKEN }}

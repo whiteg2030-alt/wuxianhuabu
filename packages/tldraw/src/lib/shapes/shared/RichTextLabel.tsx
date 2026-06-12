@@ -1,0 +1,283 @@
+import {
+	Box,
+	ExtractShapeByProps,
+	TLEventInfo,
+	TLRichText,
+	TLShapeId,
+	openWindow,
+	preventDefault,
+	useEditor,
+	useReactor,
+	useValue,
+} from '@tldraw/editor'
+import classNames from 'classnames'
+import React, { useMemo } from 'react'
+import { renderHtmlFromRichText } from '../../utils/text/richText'
+import { RichTextArea } from '../text/RichTextArea'
+import { isLegacyAlign } from './legacyProps'
+import { useEditableRichText } from './useEditableRichText'
+
+/** @public */
+export interface RichTextLabelProps {
+	shapeId: TLShapeId
+	type: ExtractShapeByProps<{ richText: TLRichText }>['type']
+	fontFamily: string
+	fontSize: number
+	lineHeight: number
+	textAlign: 'start' | 'center' | 'end'
+	verticalAlign: 'start' | 'middle' | 'end'
+	wrap?: boolean
+	richText?: TLRichText
+	labelColor: string
+	bounds?: Box
+	isSelected: boolean
+	onKeyDown?(e: KeyboardEvent): void
+	classNamePrefix?: string
+	style?: React.CSSProperties
+	textWidth?: number
+	textHeight?: number
+	padding?: number
+	hasCustomTabBehavior?: boolean
+	showTextOutline?: boolean
+}
+
+/**
+ * Renders a text label that can be used inside of shapes.
+ * The component has the ability to be edited in place and furthermore
+ * supports rich text editing.
+ *
+ * @public @react
+ */
+export const RichTextLabel = React.memo(function RichTextLabel({
+	shapeId,
+	type,
+	richText,
+	labelColor,
+	fontFamily,
+	fontSize,
+	lineHeight,
+	textAlign,
+	verticalAlign,
+	wrap,
+	isSelected,
+	padding = 0,
+	onKeyDown: handleKeyDownCustom,
+	classNamePrefix,
+	style,
+	textWidth,
+	textHeight,
+	hasCustomTabBehavior,
+	showTextOutline = true,
+}: RichTextLabelProps) {
+	const editor = useEditor()
+	const isDragging = React.useRef(false)
+	const legacyAlign = isLegacyAlign(textAlign)
+	const { rInput, isEmpty, isEditing, isReadyForEditing, ...editableTextRest } =
+		useEditableRichText(shapeId, type, richText)
+
+	const html = useMemo(() => {
+		if (richText) {
+			return renderHtmlFromRichText(editor, richText)
+		}
+		return undefined
+	}, [editor, richText])
+
+	const selectToolActive = useValue(
+		'isSelectToolActive',
+		() => editor.getCurrentToolId() === 'select',
+		[editor]
+	)
+
+	useReactor(
+		'isDragging',
+		() => {
+			editor.getInstanceState()
+			isDragging.current = editor.inputs.getIsDragging()
+		},
+		[editor]
+	)
+
+	const handlePointerDown = (e: React.MouseEvent<HTMLDivElement>) => {
+		const HTMLElementCtor = editor.getContainerWindow().HTMLElement
+		if (
+			e.target instanceof HTMLElementCtor &&
+			(e.target.tagName === 'A' || e.target.closest('a'))
+		) {
+			// This mousedown prevent default is to let dragging when over a link work.
+			preventDefault(e)
+
+			if (!selectToolActive) return
+			const link = e.target.closest('a')?.getAttribute('href') ?? ''
+			// We don't get the mouseup event later because we preventDefault
+			// so we have to do it manually.
+			const handlePointerUp = (e: TLEventInfo) => {
+				if (e.name !== 'pointer_up' || !link) return
+
+				if (!isDragging.current) {
+					openWindow(link, '_blank', false)
+				}
+				editor.off('event', handlePointerUp)
+			}
+			editor.on('event', handlePointerUp)
+		}
+	}
+
+	// Should be guarded higher up so that this doesn't render... but repeated here. This should never be true.
+	if (!isEditing && isEmpty) return null
+
+	// TODO: probably combine tl-text and tl-arrow eventually
+	const cssPrefix = classNamePrefix || 'tl-text'
+	return (
+		<div
+			className={classNames(
+				`${cssPrefix}-label tl-text-wrapper tl-rich-text-wrapper`,
+				showTextOutline ? 'tl-text__outline' : 'tl-text__no-outline'
+			)}
+			aria-hidden={!isEditing}
+			data-hastext={!isEmpty}
+			data-isediting={isEditing}
+			data-textwrap={!!wrap}
+			data-isselected={isSelected}
+			style={{
+				fontFamily,
+				textAlign,
+				justifyContent:
+					textAlign === 'center' || legacyAlign
+						? 'center'
+						: textAlign === 'end'
+							? 'flex-end'
+							: 'flex-start',
+				alignItems:
+					verticalAlign === 'middle'
+						? 'center'
+						: verticalAlign === 'end'
+							? 'flex-end'
+							: 'flex-start',
+				padding,
+				...style,
+			}}
+		>
+			<div
+				className={`${cssPrefix}-label__inner tl-text-content__wrapper`}
+				style={{
+					fontSize,
+					lineHeight: lineHeight.toString(),
+					minHeight: Math.floor(fontSize * lineHeight) + 'px',
+					minWidth: Math.ceil(textWidth || 0),
+					color: labelColor,
+					width: textWidth ? Math.ceil(textWidth) : undefined,
+					height: textHeight ? Math.ceil(textHeight) : undefined,
+				}}
+			>
+				<div className={`${cssPrefix} tl-text tl-text-content`} dir="auto">
+					{richText && (
+						<div
+							className="tl-rich-text"
+							data-is-select-tool-active={selectToolActive}
+							// todo: see if I can abuse this
+							dangerouslySetInnerHTML={{ __html: html || '' }}
+							onPointerDown={handlePointerDown}
+							data-is-ready-for-editing={isReadyForEditing}
+						/>
+					)}
+				</div>
+				{(isReadyForEditing || isSelected) && (
+					<RichTextArea
+						// Fudge the ref type because we're using forwardRef and it's not typed correctly.
+						ref={rInput as any}
+						richText={richText}
+						isEditing={isEditing}
+						shapeId={shapeId}
+						{...editableTextRest}
+						hasCustomTabBehavior={hasCustomTabBehavior}
+						handleKeyDown={handleKeyDownCustom ?? editableTextRest.handleKeyDown}
+					/>
+				)}
+			</div>
+		</div>
+	)
+})
+
+/** @public */
+export interface RichTextSVGProps {
+	bounds: Box
+	richText: TLRichText
+	fontSize: number
+	fontFamily: string
+	lineHeight: number
+	textAlign: 'start' | 'center' | 'end'
+	verticalAlign: 'start' | 'middle' | 'end'
+	wrap?: boolean
+	labelColor: string
+	padding: number
+	showTextOutline?: boolean
+}
+
+/**
+ * Renders a rich text string as SVG given bounds and text properties.
+ *
+ * @public @react
+ */
+export function RichTextSVG({
+	bounds,
+	richText,
+	fontSize,
+	fontFamily,
+	lineHeight,
+	textAlign,
+	verticalAlign,
+	wrap,
+	labelColor,
+	padding,
+	showTextOutline = true,
+}: RichTextSVGProps) {
+	const editor = useEditor()
+	const html = renderHtmlFromRichText(editor, richText)
+	const legacyAlign = isLegacyAlign(textAlign)
+	const justifyContent =
+		textAlign === 'center' || legacyAlign
+			? ('center' as const)
+			: textAlign === 'start'
+				? ('flex-start' as const)
+				: ('flex-end' as const)
+	const alignItems =
+		verticalAlign === 'middle' ? 'center' : verticalAlign === 'start' ? 'flex-start' : 'flex-end'
+	const wrapperStyle = {
+		display: 'flex',
+		fontFamily,
+		height: `100%`,
+		justifyContent,
+		alignItems,
+		padding: `${padding}px`,
+	}
+	const style = {
+		fontSize: `${fontSize}px`,
+		wrap: wrap ? 'wrap' : 'nowrap',
+		color: labelColor,
+		lineHeight,
+		textAlign,
+		width: '100%',
+		wordWrap: 'break-word' as const,
+		overflowWrap: 'break-word' as const,
+		whiteSpace: 'pre-wrap',
+		textShadow: showTextOutline ? 'var(--tl-text-outline)' : 'none',
+		tabSize: 'var(--tl-tab-size, 2)',
+	}
+
+	return (
+		<foreignObject
+			x={bounds.minX}
+			y={bounds.minY}
+			width={bounds.w}
+			height={bounds.h}
+			className={classNames(
+				'tl-export-embed-styles tl-rich-text tl-rich-text-svg',
+				showTextOutline ? 'tl-text__outline' : 'tl-text__no-outline'
+			)}
+		>
+			<div style={wrapperStyle}>
+				<div dangerouslySetInnerHTML={{ __html: html }} style={style} />
+			</div>
+		</foreignObject>
+	)
+}

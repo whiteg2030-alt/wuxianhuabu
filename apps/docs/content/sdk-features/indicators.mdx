@@ -1,0 +1,144 @@
+---
+title: Indicators
+created_at: 01/31/2026
+updated_at: 01/31/2026
+keywords:
+  - indicator
+  - selection
+  - hover
+  - outline
+  - ShapeUtil
+  - getIndicatorPath
+  - hinting
+status: published
+date: 01/31/2026
+---
+
+Indicators are the colored outlines that appear around shapes when they're selected, hovered, or being interacted with. Every shape defines its own indicator through the [ShapeUtil#getIndicatorPath](?) method.
+
+## How indicators work
+
+When you hover over or select a shape, tldraw draws an outline that matches the shape's geometry. The indicator is separate from the shape itself—it renders in an overlay layer above the canvas.
+
+Indicators appear in three contexts:
+
+| Context  | When it appears                               | Stroke weight |
+| -------- | --------------------------------------------- | ------------- |
+| Selected | Shape is in the current selection             | 1.5px         |
+| Hovered  | Pointer is over an unselected shape           | 1.5px         |
+| Hinting  | Shape is a drop target during drag operations | 2.5px         |
+
+For collaborative editing, indicators also show which shapes other users have selected, using each collaborator's cursor color. Locked shapes never show indicators.
+
+## Defining an indicator
+
+Every [ShapeUtil](?) must implement the `getIndicatorPath` method. This method returns a `Path2D`, or a richer `TLIndicatorPath` object for indicators that need clipping or additional stroked paths:
+
+```tsx
+import { ShapeUtil, TLBaseShape, Rectangle2d, T, RecordProps } from 'tldraw'
+
+type MyShape = TLBaseShape<'myshape', { w: number; h: number }>
+
+class MyShapeUtil extends ShapeUtil<MyShape> {
+	static override type = 'myshape' as const
+	static override props: RecordProps<MyShape> = {
+		w: T.number,
+		h: T.number,
+	}
+
+	getDefaultProps() {
+		return { w: 100, h: 100 }
+	}
+
+	getGeometry(shape: MyShape) {
+		return new Rectangle2d({
+			width: shape.props.w,
+			height: shape.props.h,
+			isFilled: true,
+		})
+	}
+
+	component(shape: MyShape) {
+		return <div style={{ width: shape.props.w, height: shape.props.h }} />
+	}
+
+	getIndicatorPath(shape: MyShape) {
+		const path = new Path2D()
+		path.rect(0, 0, shape.props.w, shape.props.h)
+		return path
+	}
+}
+```
+
+The `getIndicatorPath` method receives the shape and returns paths in the shape's local coordinate space. You don't need to set stroke color or width—tldraw applies those automatically based on context.
+
+### Common indicator patterns
+
+For rectangular shapes, return a rectangle path:
+
+```tsx
+getIndicatorPath(shape: MyShape) {
+	const path = new Path2D()
+	path.rect(0, 0, shape.props.w, shape.props.h)
+	return path
+}
+```
+
+For circular shapes, use an ellipse path:
+
+```tsx
+getIndicatorPath(shape: MyShape) {
+	const { w, h } = shape.props
+	const path = new Path2D()
+	path.ellipse(w / 2, h / 2, w / 2, h / 2, 0, 0, Math.PI * 2)
+	return path
+}
+```
+
+For complex paths, use the shape's geometry:
+
+```tsx
+getIndicatorPath(shape: MyShape) {
+	const geometry = this.editor.getShapeGeometry(shape)
+	return new Path2D(geometry.toSimpleSvgPath())
+}
+```
+
+### Indicators with labels
+
+Shapes with labels may need to clip the indicator where the label appears. Arrow shapes do this to prevent the indicator from overlapping label text. Return an object with additional path information:
+
+```tsx
+override getIndicatorPath(shape: MyShape) {
+	return {
+		path: mainPath,
+		clipPath: labelClipPath,
+		additionalPaths: [extraPath],
+	}
+}
+```
+
+## Hinting shapes
+
+Hinting shapes are shapes that receive a highlighted indicator during drag operations. Use [Editor#setHintingShapes](?) to mark shapes as drop targets:
+
+```tsx
+// Highlight a shape as a potential drop target
+editor.setHintingShapes([targetShapeId])
+
+// Clear hinting
+editor.setHintingShapes([])
+```
+
+Hinting indicators render with a thicker stroke (2.5px vs 1.5px) to distinguish them from regular selection.
+
+## Related articles
+
+- [Shapes](/sdk-features/shapes) - Learn how to create custom shapes with their own indicators
+- [Selection](/sdk-features/selection) - Understand how selection state controls indicator visibility
+- [UI components](/sdk-features/ui-components) - Customize canvas components including indicators
+
+## Related examples
+
+- [Custom shape](/examples/shapes/tools/custom-shape) - Create a custom shape with an indicator
+- [Custom indicators](/examples/ui/indicators-logic) - Control which shapes show indicators

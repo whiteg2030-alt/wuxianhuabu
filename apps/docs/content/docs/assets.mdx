@@ -1,0 +1,34 @@
+---
+title: Assets
+status: published
+author: steveruizok
+date: 6/9/2023
+order: 5
+keywords:
+  - image
+  - video
+  - file
+  - images
+  - videos
+  - files
+---
+
+Assets are records that store data about shared resources like images and videos. Shapes reference assets by ID rather than embedding files directly, so you can reuse the same image across multiple shapes without duplicating data.
+
+For the complete guide to working with assets, see the [Assets](/sdk-features/assets) reference.
+
+## Default storage behavior
+
+[`TLAssetStore`](?) controls how assets are stored and retrieved. The default behavior depends on your store setup:
+
+- **In-memory only** (default): [`inlineBase64AssetStore`](?) converts images to data URLs
+- **With [`persistenceKey`](/sdk-features/persistence)**: Assets are stored in the browser's [IndexedDB](https://developer.mozilla.org/en-US/docs/Web/API/IndexedDB_API)
+- **With a [sync server](/docs/sync)**: Implement `TLAssetStore` to upload to a storage service like S3
+
+## Examples
+
+- [Using hosted images](/examples/data/assets/hosted-images)
+- [Customizing default asset options](/examples/configuration/asset-props)
+- [Handling pasted/dropped external content](/examples/data/assets/external-content-sources)
+- [Simple asset store with server upload](https://github.com/tldraw/tldraw/blob/main/templates/simple-server-example/src/client/App.tsx)
+- [Asset store with image optimization](https://github.com/tldraw/tldraw/blob/main/packages/sync/src/useSyncDemo.ts#L178-L256)

@@ -1,0 +1,627 @@
+{
+  "0095a9fa74": {
+    "translation": "내보내기"
+  },
+  "03b3e13197": {
+    "translation": "이 페이지의 사이드바로 파일을 드래그하세요. 또는 사용자 메뉴에서 '파일 가져오기' 옵션을 선택합니다."
+  },
+  "043973ec1f": {
+    "translation": "여전히 문제가 있나요? {GetHelpLink}"
+  },
+  "06b9281e39": {
+    "translation": "자동"
+  },
+  "07dbd11b21": {
+    "translation": "제목 없는 파일"
+  },
+  "08331c1710": {
+    "translation": "비율 제한이 초과되었습니다. 잠시 후 다시 시도하세요."
+  },
+  "08bd40c754": {
+    "translation": "계정"
+  },
+  "0a91f7fa87": {
+    "translation": "이 파일은 크기 제한에 도달하여 변경 사항이 더 이상 저장되지 않을 수 있습니다. 일부 콘텐츠를 삭제하거나 새 파일을 시작하세요."
+  },
+  "0b27918290": {
+    "translation": "파일"
+  },
+  "0b9a4cde72": {
+    "translation": "파일 메뉴"
+  },
+  "0d1f2bb523": {
+    "translation": "피드백 보내기"
+  },
+  "110a4b01be": {
+    "translation": "게시"
+  },
+  "129b9e34ea": {
+    "translation": "그룹 탈퇴"
+  },
+  "12a6766ba1": {
+    "translation": "파일 고정 해제"
+  },
+  "12c8a9838c": {
+    "translation": "tldraw SDK를 사용해 보세요"
+  },
+  "13ddd375ad": {
+    "translation": "내보내기 형식"
+  },
+  "146ffe2fd9": {
+    "translation": "더 보기"
+  },
+  "14d65465b7": {
+    "translation": "그룹 삭제"
+  },
+  "181b90f889": {
+    "translation": "파일 생성"
+  },
+  "1da2e8106b": {
+    "translation": "예기치 못한 오류가 발생했습니다."
+  },
+  "1dd1c5fb7f": {
+    "translation": "오늘"
+  },
+  "2445e5e347": {
+    "translation": "그룹 만들기"
+  },
+  "250ddea65c": {
+    "translation": "tldraw에 대하여"
+  },
+  "299cb00a7a": {
+    "translation": "업로드 실패"
+  },
+  "2c3ef76333": {
+    "translation": "내 파일"
+  },
+  "2e2b3c700b": {
+    "translation": "현재 파일 링크를 포함하세요"
+  },
+  "31246941ad": {
+    "translation": "이 파일을 보려면 로그인해야 합니다."
+  },
+  "31418ce4ad": {
+    "translation": "i18n(국제화): 하이라이트 누락"
+  },
+  "32210b37e4": {
+    "translation": "링크 추가"
+  },
+  "324a0f3182": {
+    "translation": "tldraw로 돌아가기"
+  },
+  "335defdafe": {
+    "translation": "페이지를 새로 고침해 주세요."
+  },
+  "344a7f427f": {
+    "translation": "편집기"
+  },
+  "3bc7d6ea2f": {
+    "translation": "이메일로 계속하기"
+  },
+  "3bd1b98dbd": {
+    "translation": "변경 사항을 게시할 수 없습니다."
+  },
+  "3c5e891bff": {
+    "translation": "고정됨"
+  },
+  "3d0238bf16": {
+    "translation": "모두 수락"
+  },
+  "3e2ae04ff0": {
+    "translation": "지원되지 않는 머메이드 다이어그램"
+  },
+  "402bf0c47e": {
+    "translation": "색상 테마"
+  },
+  "42e53c47c1": {
+    "translation": "액세스 권한 요청은 소유주에게 문의하세요."
+  },
+  "44db318ee5": {
+    "translation": "Discord에서 도움 받기"
+  },
+  "46137245cd": {
+    "translation": "tldraw 개선에 도움을 주셔서 감사합니다!"
+  },
+  "477df802ca": {
+    "translation": "편집을 계속하려면 파일을 파일로 복사하세요."
+  },
+  "47839e47a5": {
+    "translation": "tldraw"
+  },
+  "47f493a590": {
+    "translation": "핀 파일"
+  },
+  "49049467ff": {
+    "translation": "tldraw 파일 URL을 붙여넣습니다..."
+  },
+  "4908687e50": {
+    "translation": "이 파일을 무시하시겠습니까?"
+  },
+  "49ee308734": {
+    "translation": "이름"
+  },
+  "4d0d3ddec9": {
+    "translation": "이 사이트에서는 앱을 작동시키고 분석 정보를 수집하기 위해 쿠키를 사용합니다."
+  },
+  "4d1c8263ba": {
+    "translation": "다시 로드"
+  },
+  "4da5988a2e": {
+    "translation": "그룹 삭제…"
+  },
+  "4dab36ac83": {
+    "translation": "더 많은 옵션"
+  },
+  "4e6fbf032b": {
+    "translation": "이 그룹을 삭제하시겠습니까? 이 작업은 실행 취소할 수 없습니다."
+  },
+  "5097d89907": {
+    "translation": "지원되지 않는 다이어그램이므로 SVG를 생성합니다."
+  },
+  "50db1b7e1e": {
+    "translation": "파일 게시를 취소할 수 없습니다."
+  },
+  "517bb809d9": {
+    "translation": "페이지 메뉴"
+  },
+  "542248f0ba": {
+    "translation": "이 파일은 이제 읽기 전용입니다."
+  },
+  "54286b1d01": {
+    "translation": "공동 작업자 정원 도달"
+  },
+  "554a05155c": {
+    "translation": "여전히 문제가 있습니까? <a>문제 보고</a>"
+  },
+  "55505ba281": {
+    "translation": "PNG"
+  },
+  "5677e381d2": {
+    "translation": "tldraw를 개선하기 위해 분석 쿠키를 사용합니다."
+  },
+  "56c34c6410": {
+    "translation": "개인정보 보호정책"
+  },
+  "5a86b22fa0": {
+    "translation": "시작하려면 파일을 여기로 끌어다 놓거나, <create>파일을 생성</create>하거나, <invite>초대 링크 복사</invite>하세요."
+  },
+  "5a95a425f7": {
+    "translation": "공유"
+  },
+  "5bec508475": {
+    "translation": "이전 브라우저가 감지되었습니다. 이 앱을 사용하려면 브라우저를 업데이트하세요."
+  },
+  "5c6fe42bc2": {
+    "translation": "이 링크를 취소하고 새 링크를 만드세요."
+  },
+  "5d04a002ea": {
+    "translation": "연결할 수 없습니다"
+  },
+  "5d26ae7550": {
+    "translation": "로그인하기 전에 생성하신 콘텐츠 중 일부를 업로드하지 못했습니다."
+  },
+  "5ea8bb44be": {
+    "translation": "귀하는 그룹에 초대되었습니다:"
+  },
+  "5f3c333678": {
+    "translation": "피드백 제출됨"
+  },
+  "5fb63579fc": {
+    "translation": "복사"
+  },
+  "61057a0c84": {
+    "translation": "이후"
+  },
+  "625fd29749": {
+    "translation": "이전"
+  },
+  "639bae9ac6": {
+    "translation": "너"
+  },
+  "63a6a88c06": {
+    "translation": "새로 고치다"
+  },
+  "6609dd239e": {
+    "translation": "문제가 발생했습니다"
+  },
+  "6637a98151": {
+    "translation": "tldraw의 새 버전이 출시되었습니다. 계속하려면 페이지를 다시 로드하세요."
+  },
+  "6832ac5936": {
+    "translation": "이메일 주소를 입력하세요"
+  },
+  "6a26f54883": {
+    "translation": "도움말"
+  },
+  "6dc0836c1b": {
+    "translation": "이 작업을 수행할 필수 권한이 없습니다."
+  },
+  "6dfc62f621": {
+    "translation": "수동으로 콘텐츠를 가져오려면 다음 단계를 따르세요."
+  },
+  "70222abcfc": {
+    "translation": "그룹 설정"
+  },
+  "70a6facb9d": {
+    "translation": "이번 주"
+  },
+  "71a29b007b": {
+    "translation": "tldraw 관련 버그, 문제 또는 아이디어가 있으신가요? 알려주세요!"
+  },
+  "73ab799383": {
+    "translation": "이 tldraw 버전은 더 이상 지원되지 않습니다."
+  },
+  "7408cf0d7b": {
+    "translation": "페이지를 다시 로드해 주세요"
+  },
+  "752b79f137": {
+    "translation": "최대 파일 수에 도달했습니다. 새 파일을 만들기 전에 이전 파일을 삭제해야 합니다."
+  },
+  "7573b8110a": {
+    "translation": "액세스 권한 없음"
+  },
+  "761e93ede9": {
+    "translation": "쿠키 관리"
+  },
+  "7697920637": {
+    "translation": "다시 로드해주세요"
+  },
+  "764671e008": {
+    "translation": "Discord에서 우리와 채팅하세요"
+  },
+  "76dea3c9ca": {
+    "translation": "tldraw는 무료 온라인 화이트보드입니다. 계정을 만들어 파일을 저장하고 친구들과 함께 작업하세요."
+  },
+  "777f9e90cf": {
+    "translation": "유효하지 않은 요청입니다."
+  },
+  "7827371d1a": {
+    "translation": "이 익명의 tldraw 멀티플레이어 파일은 이제 읽기 전용입니다. 편집을 계속하려면 로그인하여 파일에 복사하세요."
+  },
+  "78e9815992": {
+    "translation": "알았어요"
+  },
+  "797799f35e": {
+    "translation": "GitHub에 이슈 제출"
+  },
+  "7a1920d611": {
+    "translation": "기본"
+  },
+  "7b1329f5ca": {
+    "translation": "사용 설명서"
+  },
+  "7be10fc592": {
+    "translation": "버전 복원"
+  },
+  "7c0747a5df": {
+    "translation": "추첨 열기"
+  },
+  "7cb5f8b4a5": {
+    "translation": "무시"
+  },
+  "7cfe6c43dc": {
+    "translation": "그룹 탈퇴…"
+  },
+  "7daeced9ff": {
+    "translation": "변경 사항 게시"
+  },
+  "7fcdcc6455": {
+    "translation": "파일 무시"
+  },
+  "801ab24683": {
+    "translation": "다운로드"
+  },
+  "815e116a2e": {
+    "translation": "tldraw 관련 버그, 문제 또는 아이디어가 있으신가요? 알려주세요! 이 양식을 작성해 주시면 필요 시 이메일로 답변해 드리겠습니다. <discord>Discord에서 채팅</discord>하거나 <github>GitHub에서 문제를 제출</github>하실 수도 있습니다."
+  },
+  "85a082de1b": {
+    "translation": "최신 tldraw 버전을 받으려면 페이지를 새로 고침해 주세요."
+  },
+  "86353d2c41": {
+    "translation": "{total}개의 .tldr 파일을 추가했습니다."
+  },
+  "86c66437fd": {
+    "translation": "파일 이름 바꾸기"
+  },
+  "8ad4303b83": {
+    "translation": "아니요, 고맙습니다"
+  },
+  "8c2d3d730c": {
+    "translation": "이메일에서 인증 코드를 확인하세요."
+  },
+  "8eb2c00e96": {
+    "translation": "나와 공유됨"
+  },
+  "8ff3d0a705": {
+    "translation": "비율 제한됨"
+  },
+  "902b0d55fd": {
+    "translation": "오류"
+  },
+  "904a830405": {
+    "translation": "이름 바꾸기"
+  },
+  "91e49bb0eb": {
+    "translation": "내 파일로 복사"
+  },
+  "930390d222": {
+    "translation": "초대 링크 복사됨"
+  },
+  "9489b2f82a": {
+    "translation": "당신은 이미 이 그룹의 회원입니다"
+  },
+  "95aacd4d4a": {
+    "translation": "Google로 로그인"
+  },
+  "95d2109dc8": {
+    "translation": "tldraw SDK로 빌드"
+  },
+  "96165d6df5": {
+    "translation": "이번 달"
+  },
+  "985a4b720f": {
+    "translation": "이용 약관"
+  },
+  "98c997a27e": {
+    "translation": "파일 링크 추가"
+  },
+  "9914a0ce04": {
+    "translation": "라이트"
+  },
+  "9b33f5c63c": {
+    "translation": "코드를 받지 못하셨나요? <resend>다시 보내기</resend>."
+  },
+  "9bef626805": {
+    "translation": "파일 삭제"
+  },
+  "9ccb565b86": {
+    "translation": "인증 서비스 연결에 문제가 발생했습니다. 이는 일시적인 현상입니다. 페이지를 새로고침해 주세요."
+  },
+  "9ceb927baa": {
+    "translation": "이 파일 게시"
+  },
+  "9e076f5885": {
+    "translation": "찾을 수 없음"
+  },
+  "9e93c98d88": {
+    "translation": "거부하기"
+  },
+  "a0da245992": {
+    "translation": "콘텐츠를 .tldr 파일로 내보내려면 왼쪽 상단 메뉴에서 '다운로드'를 선택하세요."
+  },
+  "a104439641": {
+    "translation": "여백"
+  },
+  "a18366b217": {
+    "translation": "다크"
+  },
+  "a1c915578c": {
+    "translation": "찾고 계신 파일이 존재하지 않습니다."
+  },
+  "a239905023": {
+    "translation": "이미지 내보내기"
+  },
+  "a3debabee7": {
+    "translation": "쿠키 정책"
+  },
+  "a4d3b161ce": {
+    "translation": "제출하다"
+  },
+  "a6cc403d56": {
+    "translation": "링크가 있는 사람"
+  },
+  "a768caa988": {
+    "translation": "해석학"
+  },
+  "a8873770ab": {
+    "translation": "파일이 커지고 있습니다"
+  },
+  "a9ded1e5ce": {
+    "translation": "배경"
+  },
+  "ab0df9ba36": {
+    "translation": "파일 제한에 도달했습니다"
+  },
+  "af3dc88931": {
+    "notes": "This is used to show the last time the file was published. An example is 'Last published 5 minutes ago'.",
+    "translation": "마지막 게시: <date></date>"
+  },
+  "b028909917": {
+    "translation": "게스트 사용자"
+  },
+  "b2c3c2e30c": {
+    "translation": "파일이 가득 찼습니다"
+  },
+  "b357b524e7": {
+    "translation": "이메일 주소"
+  },
+  "b3d2db69fe": {
+    "translation": "파일 URL"
+  },
+  "b6d4223e60": {
+    "translation": "로그인"
+  },
+  "b6f4a2ec63": {
+    "translation": "소유자"
+  },
+  "b758336699": {
+    "translation": "링크 복사"
+  },
+  "ba0318cb81": {
+    "translation": "공유하려면 로그인하세요"
+  },
+  "bb93a7590f": {
+    "translation": "그룹 수락 및 가입"
+  },
+  "bbbcefd7ce": {
+    "translation": "{total, plural, other {{uploaded}개 중 {total}개의 .tldr 파일을 업로드하는 중…}}"
+  },
+  "bc88b0e89e": {
+    "translation": "{ownerName} 님이 공유함"
+  },
+  "c2276c9127": {
+    "translation": "공유에 대해 자세히 알아보세요."
+  },
+  "c28aed8348": {
+    "translation": "<cookies>analytics</cookies>를 허용하여 tldraw를 개선하세요."
+  },
+  "c303bd1095": {
+    "translation": "이 파일을 게시할 수 없습니다."
+  },
+  "c4b39a1cc3": {
+    "translation": "필수 쿠키"
+  },
+  "c6155aaecc": {
+    "translation": "그룹 이름"
+  },
+  "c655b27b1e": {
+    "translation": "i18n(국제화): 롱 스트링"
+  },
+  "c6a00f137b": {
+    "translation": "초대"
+  },
+  "c74ea6dbff": {
+    "translation": "덜 보기"
+  },
+  "c87aacf567": {
+    "translation": "로그아웃"
+  },
+  "c8a59e7135": {
+    "translation": "닫기"
+  },
+  "c9cc8cce24": {
+    "translation": "구하다"
+  },
+  "cceaefbc20": {
+    "translation": "이 파일 공유"
+  },
+  "cd15a75c26": {
+    "translation": "SVG"
+  },
+  "ce0547606c": {
+    "translation": "이 파일의 크기 제한에 거의 도달했습니다. 일부 콘텐츠를 삭제하거나 새 파일을 만들어 보세요."
+  },
+  "cea291e45e": {
+    "translation": "게시에 대해 자세히 알아보세요."
+  },
+  "d3d2e61733": {
+    "translation": "닫기"
+  },
+  "d46632fe1f": {
+    "translation": "요청이 너무 많습니다. 천천히 해주세요."
+  },
+  "d4bbf74f3e": {
+    "translation": "사이드바 전환"
+  },
+  "d638a3344b": {
+    "translation": "시작하기에 앞서, <tos>이용약관</tos> 및 <privacy>개인정보처리방침</privacy>에 동의해 주시기 바랍니다."
+  },
+  "d721757161": {
+    "translation": "테마"
+  },
+  "d876a9fe1a": {
+    "translation": "다시 시도"
+  },
+  "d88ad2dc74": {
+    "translation": "수락하고 계속하세요"
+  },
+  "d9100f3e10": {
+    "translation": "여기로 이동하여 콘텐츠 보기"
+  },
+  "d9e35d0f55": {
+    "translation": "최대 그룹 수에 도달했습니다. 새 그룹을 만들려면 기존 그룹을 삭제해야 합니다."
+  },
+  "dbbebf3c03": {
+    "translation": "초대만"
+  },
+  "dcdaa754fe": {
+    "translation": "잘못된 tldraw 파일 URL"
+  },
+  "dfdb78a4e4": {
+    "translation": "앱 디버그 신고"
+  },
+  "e0c88179b3": {
+    "translation": "회원 초대"
+  },
+  "e2198d6228": {
+    "translation": "초대 링크 복사"
+  },
+  "e2ae80a510": {
+    "translation": "법적 요약"
+  },
+  "e3afed0047": {
+    "translation": "관리자"
+  },
+  "e404559826": {
+    "translation": "서비스 약관"
+  },
+  "e81c4e4f2b": {
+    "translation": "또는"
+  },
+  "ea0626ac5a": {
+    "translation": "위험 구역"
+  },
+  "ea4788705e": {
+    "translation": "취소"
+  },
+  "ebfe9ce86e": {
+    "translation": "어제"
+  },
+  "ec59b960ea": {
+    "translation": "이 파일의 활성 공동 작업자 최대 정원에 도달했습니다."
+  },
+  "ec611e9a08": {
+    "translation": "계정 메뉴"
+  },
+  "ed53713239": {
+    "translation": "i18n(국제화): 강조됨"
+  },
+  "ed75712b0e": {
+    "translation": "복제"
+  },
+  "ede55d955f": {
+    "translation": "자세한 내용을 알아보려면 <a>쿠키 정책</a>을 읽어보세요."
+  },
+  "ef53538ae4": {
+    "translation": "회원들"
+  },
+  "ef7de3f485": {
+    "translation": "선택된"
+  },
+  "f09b16bc5f": {
+    "translation": "tldraw를 개선하는 데 도움이 되는 분석 자료를 수집하고, 파일을 동기화하고, 로그인 상태를 유지하기 위해 쿠키를 사용합니다."
+  },
+  "f0e8bff6f9": {
+    "translation": "사용자 설정"
+  },
+  "f2569594b2": {
+    "translation": "이 쿠키는 귀하의 파일과 설정을 저장하는 데 사용됩니다."
+  },
+  "f2a6c498fb": {
+    "translation": "삭제"
+  },
+  "f4f70727dc": {
+    "translation": "설정"
+  },
+  "f714e36843": {
+    "translation": "정말로 이 그룹을 떠나시겠습니까?"
+  },
+  "fa2ead697d": {
+    "translation": "개인정보 보호정책"
+  },
+  "fb15c53f22": {
+    "translation": "뷰어"
+  },
+  "fd1be3efcf": {
+    "translation": "이 파일을 삭제하시겠습니까?"
+  },
+  "fed5ec05eb": {
+    "translation": "복사된 링크"
+  },
+  "ff7a814974": {
+    "translation": "파일 링크 추가…"
+  },
+  "ffcd73e997": {
+    "translation": "파일 가져오기…"
+  }
+}

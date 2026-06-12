@@ -1,0 +1,32 @@
+name: Get draft changelog
+
+on:
+  workflow_dispatch:
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  deploy:
+    name: 'Get draft changlog'
+    timeout-minutes: 60
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Run our setup
+        uses: ./.github/actions/setup
+
+      - name: Extract changelog
+        run: yarn extract-draft-changelog
+
+      - name: Upload changelog.md to artifacts
+        uses: actions/upload-artifact@v6
+        with:
+          name: changelog-output
+          path: changelog.md

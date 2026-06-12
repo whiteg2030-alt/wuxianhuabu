@@ -1,0 +1,12 @@
+!.env
+
+# sst
+.sst
+
+# generated fly configs (contain secrets)
+flyio-replication-manager.toml
+flyio-view-syncer.toml
+flyio.toml
+
+# generated Dockerfile (from template)
+Dockerfile
