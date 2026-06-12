@@ -492,6 +492,8 @@ export default function AiCanvasAgentExample() {
 	const [apiBaseUrlInput, setApiBaseUrlInput] = useState('')
 	const [apiKeySaving, setApiKeySaving] = useState(false)
 	const [arkStatus, setArkStatus] = useState<ApiStatus>('checking')
+	const [arkKeyInput, setArkKeyInput] = useState('')
+	const [arkKeySaving, setArkKeySaving] = useState(false)
 	const [imageModels, setImageModels] = useState<ModelOption[]>([])
 	const [imageModel, setImageModel] = useState('')
 	const [textModels, setTextModels] = useState<ModelOption[]>([])
@@ -1571,6 +1573,34 @@ export default function AiCanvasAgentExample() {
 		}
 	}
 
+	async function handleSaveArkKey(event: FormEvent<HTMLFormElement>) {
+		event.preventDefault()
+		const arkApiKey = arkKeyInput.trim()
+		if (!arkApiKey) {
+			setModelError('请输入火山引擎 ARK API Key')
+			return
+		}
+		setArkKeySaving(true)
+		setModelError(null)
+		try {
+			const response = await fetch('/api/ark-key', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ arkApiKey }),
+			})
+			const data = (await response.json()) as { error?: string }
+			if (!response.ok) throw new Error(data.error || 'ARK Key 保存失败')
+			setArkKeyInput('')
+			setArkStatus('ready')
+			setApiRefreshNonce((current) => current + 1)
+			setCanvasNotice('火山引擎 ARK Key 已保存，可以生成视频了')
+		} catch (err) {
+			setModelError(err instanceof Error ? err.message : 'ARK Key 保存失败')
+		} finally {
+			setArkKeySaving(false)
+		}
+	}
+
 	async function generateVideoForNode(videoNode: VideoNode) {
 		if (arkStatus !== 'ready') {
 			updateVideoNode(videoNode.id, {
@@ -2153,6 +2183,11 @@ export default function AiCanvasAgentExample() {
 					onBaseUrlInputChange={setApiBaseUrlInput}
 					onClose={() => setApiKeyPanelOpen(false)}
 					onSubmit={handleSaveApiKey}
+					arkStatus={arkStatus}
+					arkKeyInput={arkKeyInput}
+					arkSaving={arkKeySaving}
+					onArkKeyInputChange={setArkKeyInput}
+					onArkSubmit={handleSaveArkKey}
 				/>
 			)}
 
@@ -3505,6 +3540,11 @@ function ApiKeyPanel({
 	onBaseUrlInputChange,
 	onClose,
 	onSubmit,
+	arkStatus,
+	arkKeyInput,
+	arkSaving,
+	onArkKeyInputChange,
+	onArkSubmit,
 }: {
 	apiStatus: ApiStatus
 	apiKeyInput: string
@@ -3515,6 +3555,11 @@ function ApiKeyPanel({
 	onBaseUrlInputChange(value: string): void
 	onClose(): void
 	onSubmit(event: FormEvent<HTMLFormElement>): void
+	arkStatus: ApiStatus
+	arkKeyInput: string
+	arkSaving: boolean
+	onArkKeyInputChange(value: string): void
+	onArkSubmit(event: FormEvent<HTMLFormElement>): void
 }) {
 	return (
 		<section className="tap-api-key-panel" onPointerDown={(event) => event.stopPropagation()}>
@@ -3558,6 +3603,26 @@ function ApiKeyPanel({
 					</button>
 					<button type="submit" disabled={saving || !apiKeyInput.trim()}>
 						{saving ? '保存中' : '保存并检查'}
+					</button>
+				</div>
+			</form>
+			<form onSubmit={onArkSubmit} className="tap-api-key-panel__ark">
+				<label>
+					<span>火山引擎 ARK API Key（Seedance 视频生成）</span>
+					<input
+						type="password"
+						value={arkKeyInput}
+						onChange={(event) => onArkKeyInputChange(event.target.value)}
+						placeholder="火山方舟控制台创建的 API Key"
+						autoComplete="off"
+					/>
+				</label>
+				<div className="tap-api-key-panel__actions">
+					<span className="tap-api-key-panel__ark-status" data-state={arkStatus}>
+						{arkStatus === 'ready' ? 'ARK 已配置' : 'ARK 未配置'}
+					</span>
+					<button type="submit" disabled={arkSaving || !arkKeyInput.trim()}>
+						{arkSaving ? '保存中' : '保存 ARK Key'}
 					</button>
 				</div>
 			</form>

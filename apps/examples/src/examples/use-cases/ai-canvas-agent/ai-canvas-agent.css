@@ -2323,3 +2323,19 @@
 	font-size: 12px;
 	cursor: pointer;
 }
+
+.tap-api-key-panel__ark {
+	margin-top: 12px;
+	padding-top: 12px;
+	border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.tap-api-key-panel__ark-status {
+	align-self: center;
+	color: #9aa1ab;
+	font-size: 12px;
+}
+
+.tap-api-key-panel__ark-status[data-state='ready'] {
+	color: #7ddb9a;
+}
