@@ -3,7 +3,7 @@ import {
 	FormEvent,
 	MouseEvent as ReactMouseEvent,
 	PointerEvent as ReactPointerEvent,
-	WheelEvent,
+	useCallback,
 	useEffect,
 	useMemo,
 	useRef,
@@ -840,6 +840,10 @@ export default function AiCanvasAgentExample() {
 	}
 
 	function handleViewportPointerDown(event: ReactPointerEvent<HTMLDivElement>) {
+		if (event.button === 1) {
+			beginCanvasPan(event)
+			return
+		}
 		if (event.button !== 0) return
 		setGenerationMenu(null)
 		setQuickActionMenu(null)
@@ -858,6 +862,17 @@ export default function AiCanvasAgentExample() {
 		}
 
 		setSelectedNodeIds([])
+		setPanState({
+			start: { x: event.clientX, y: event.clientY },
+			origin: { x: transform.x, y: transform.y },
+		})
+	}
+
+	function beginCanvasPan(event: ReactPointerEvent<HTMLElement>) {
+		event.preventDefault()
+		event.stopPropagation()
+		setGenerationMenu(null)
+		setQuickActionMenu(null)
 		setPanState({
 			start: { x: event.clientX, y: event.clientY },
 			origin: { x: transform.x, y: transform.y },
@@ -883,7 +898,15 @@ export default function AiCanvasAgentExample() {
 
 	function handleNodePointerDown(event: ReactPointerEvent<HTMLElement>, node: CanvasNode) {
 		const target = event.target as HTMLElement
-		if (target.closest('button, input, textarea, select, label, .tap-node__connector')) return
+		if (target.closest('button, input, textarea, select, label, .tap-node__connector')) {
+			event.stopPropagation()
+			return
+		}
+		if (event.button === 1) {
+			beginCanvasPan(event)
+			return
+		}
+		if (event.button !== 0) return
 		event.stopPropagation()
 		setGenerationMenu(null)
 		setQuickActionMenu(null)
@@ -991,20 +1014,45 @@ export default function AiCanvasAgentExample() {
 		setPanState(null)
 	}
 
-	function handleWheel(event: WheelEvent<HTMLDivElement>) {
-		event.preventDefault()
-		const nextZoom = clamp(transform.zoom * (event.deltaY > 0 ? 0.92 : 1.08), MIN_ZOOM, MAX_ZOOM)
-		const rect = viewportRef.current?.getBoundingClientRect()
-		const screenX = rect ? event.clientX - rect.left : event.clientX
-		const screenY = rect ? event.clientY - rect.top : event.clientY
-		const canvasX = (screenX - transform.x) / transform.zoom
-		const canvasY = (screenY - transform.y) / transform.zoom
-		setTransform({
-			zoom: nextZoom,
-			x: screenX - canvasX * nextZoom,
-			y: screenY - canvasY * nextZoom,
-		})
-	}
+	const handleWheel = useCallback(
+		(event: globalThis.WheelEvent) => {
+			event.preventDefault()
+			if (!event.ctrlKey && !event.metaKey) {
+				setTransform((current) => ({
+					...current,
+					x: current.x - event.deltaX,
+					y: current.y - event.deltaY,
+				}))
+				return
+			}
+
+			const nextZoom = clamp(transform.zoom * (event.deltaY > 0 ? 0.92 : 1.08), MIN_ZOOM, MAX_ZOOM)
+			const rect = viewportRef.current?.getBoundingClientRect()
+			const screenX = rect ? event.clientX - rect.left : event.clientX
+			const screenY = rect ? event.clientY - rect.top : event.clientY
+			const canvasX = (screenX - transform.x) / transform.zoom
+			const canvasY = (screenY - transform.y) / transform.zoom
+			setTransform({
+				zoom: nextZoom,
+				x: screenX - canvasX * nextZoom,
+				y: screenY - canvasY * nextZoom,
+			})
+		},
+		[transform]
+	)
+
+	useEffect(() => {
+		const handleNativeWheel = (event: globalThis.WheelEvent) => {
+			const target = event.target
+			if (!(target instanceof Element)) return
+			if (!target.closest('.tap-canvas')) return
+			if (event.ctrlKey || event.metaKey || target.closest('.tap-canvas__viewport')) {
+				handleWheel(event)
+			}
+		}
+		window.addEventListener('wheel', handleNativeWheel, { passive: false })
+		return () => window.removeEventListener('wheel', handleNativeWheel)
+	}, [handleWheel])
 
 	function handleDragOver(event: ReactDragEvent<HTMLDivElement>) {
 		if (!hasImageFiles(event.dataTransfer)) return
@@ -2165,9 +2213,16 @@ export default function AiCanvasAgentExample() {
 		>
 			<header className="tap-canvas__topbar">
 				<div className="tap-brand">
-					<div className="tap-brand__mark">T</div>
-					<div>
-						<h1>Ai无限画布</h1>
+					<div className="tap-brand__mark">
+						<img src="/studio-mark-light.png" alt="" draggable={false} />
+					</div>
+					<div className="tap-brand__copy">
+						<img
+							className="tap-brand__logo"
+							src="/ai-x-lab-wordmark-light.png"
+							alt="Ai x Lab"
+							draggable={false}
+						/>
 						<p>把图片拖进画布，向右拖出生成链路</p>
 					</div>
 				</div>
@@ -2288,8 +2343,8 @@ export default function AiCanvasAgentExample() {
 				ref={viewportRef}
 				className="tap-canvas__viewport"
 				onPointerDown={handleViewportPointerDown}
+				onAuxClick={(event) => event.preventDefault()}
 				onDoubleClick={handleViewportDoubleClick}
-				onWheel={handleWheel}
 			>
 				<div
 					className="tap-canvas__world"
@@ -2985,16 +3040,11 @@ function ImageNodeView({
 				</div>
 				<strong>{node.title}</strong>
 			</header>
-			<button
+			<div
 				className="tap-image-frame"
-				type="button"
 				style={{ width: node.displayWidth, height: node.displayHeight }}
-				onClick={(event) => {
-					if (annotationMode) return
-					event.stopPropagation()
-					onPreview(node)
-				}}
-				aria-label={`放大查看 ${node.title}`}
+				role="img"
+				aria-label={node.title}
 			>
 				<img src={node.imageUrl} alt={node.title} draggable={false} />
 				<svg
@@ -3011,8 +3061,11 @@ function ImageNodeView({
 					))}
 					{draftAnnotationPath ? <path d={draftAnnotationPath} data-draft="true" /> : null}
 				</svg>
-			</button>
+			</div>
 			<div className="tap-node__footer">
+				<button type="button" onClick={() => onPreview(node)}>
+					预览
+				</button>
 				<button type="button" onClick={() => onDownload(node)}>
 					下载原图
 				</button>
@@ -3031,6 +3084,14 @@ function ImageNodeView({
 					className="tap-node__workflow-presets"
 					onPointerDown={(event) => event.stopPropagation()}
 				>
+					<button
+						className="tap-node__workflow-preview"
+						type="button"
+						onClick={() => onPreview(node)}
+					>
+						<strong>放大预览</strong>
+						<span>选中图片后手动打开大图，不再误触放大</span>
+					</button>
 					{(annotationMode || annotations.length > 0 || node.annotationNote) && (
 						<div className="tap-node__annotation-panel">
 							<div>

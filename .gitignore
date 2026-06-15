@@ -140,3 +140,7 @@ skills/pr-walkthrough/video/dist
 skills/pr-walkthrough/video/public/audio-*
 skills/pr-walkthrough/video/public/manifest.json
 todo.md
+
+# Local AI canvas share artifacts
+/ai-canvas-share/
+/ai-canvas-share.zip

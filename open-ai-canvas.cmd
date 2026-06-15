@@ -1,7 +1,7 @@
 @echo off
 setlocal
 set "PROJECT_ROOT=%~dp0"
-set "AI_CANVAS_URL=http://localhost:5420/ai-canvas-agent"
+set "AI_CANVAS_URL=http://localhost:5420/ai-canvas-agent/full"
 
 powershell -ExecutionPolicy Bypass -File "%PROJECT_ROOT%start-dev-background.ps1"
 if errorlevel 1 (

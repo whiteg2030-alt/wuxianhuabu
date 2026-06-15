@@ -116,9 +116,16 @@ function LoginScreen() {
 		<div className="auth-screen">
 			<div className="auth-screen__panel">
 				<div className="auth-screen__brand">
-					<div className="auth-screen__mark">tl</div>
-					<div>
-						<h1>图像流画布</h1>
+					<div className="auth-screen__mark">
+						<img src="/studio-mark-light.png" alt="" draggable={false} />
+					</div>
+					<div className="auth-screen__brand-copy">
+						<img
+							className="auth-screen__logo"
+							src="/ai-x-lab-wordmark-light.png"
+							alt="Ai x Lab"
+							draggable={false}
+						/>
 						<p>登录后进入中文图片节点工作流。</p>
 					</div>
 				</div>

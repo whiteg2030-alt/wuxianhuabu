@@ -4,9 +4,7 @@
 	display: grid;
 	place-items: center;
 	padding: 24px;
-	background:
-		linear-gradient(135deg, rgba(18, 24, 38, 0.05), rgba(37, 99, 235, 0.04)),
-		#f6f7f9;
+	background: linear-gradient(135deg, rgba(18, 24, 38, 0.05), rgba(37, 99, 235, 0.04)), #f6f7f9;
 	color: #15171c;
 }
 
@@ -29,7 +27,7 @@
 
 .auth-screen__brand {
 	display: grid;
-	grid-template-columns: 44px 1fr;
+	grid-template-columns: 52px 1fr;
 	gap: 14px;
 	align-items: center;
 	margin-bottom: 24px;
@@ -38,24 +36,41 @@
 .auth-screen__mark {
 	display: grid;
 	place-items: center;
-	width: 44px;
-	height: 44px;
+	width: 52px;
+	height: 52px;
 	border-radius: 8px;
 	background: #15171c;
 	color: white;
 	font-weight: 700;
 	letter-spacing: 0;
+	padding: 7px;
 }
 
-.auth-screen__brand h1 {
-	margin: 0;
-	font-size: 24px;
-	line-height: 1.1;
-	letter-spacing: 0;
+.auth-screen__mark img {
+	display: block;
+	width: 100%;
+	height: 100%;
+	object-fit: contain;
+	pointer-events: none;
+}
+
+.auth-screen__brand-copy {
+	display: grid;
+	gap: 8px;
+	min-width: 0;
+}
+
+.auth-screen__logo {
+	display: block;
+	width: min(260px, 64vw);
+	height: 34px;
+	object-fit: contain;
+	object-position: left center;
+	pointer-events: none;
 }
 
 .auth-screen__brand p {
-	margin: 6px 0 0;
+	margin: 0;
 	color: #687080;
 	font-size: 14px;
 	line-height: 1.45;

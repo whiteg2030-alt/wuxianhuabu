@@ -17,6 +17,16 @@
 	box-sizing: border-box;
 }
 
+.tap-canvas input,
+.tap-canvas textarea,
+.tap-canvas select,
+.tap-canvas [contenteditable='true'] {
+	-webkit-user-select: text !important;
+	cursor: text !important;
+	user-select: text !important;
+	touch-action: auto;
+}
+
 .tap-canvas__topbar {
 	position: absolute;
 	z-index: 20;
@@ -49,6 +59,7 @@
 	align-items: center;
 	gap: 12px;
 	min-width: 0;
+	max-width: min(520px, calc(100vw - 40px));
 	border: 1px solid rgba(255, 255, 255, 0.12);
 	border-radius: 8px;
 	background: rgba(24, 25, 28, 0.9);
@@ -60,31 +71,46 @@
 .tap-brand__mark {
 	display: grid;
 	place-items: center;
-	width: 38px;
-	height: 38px;
+	width: 44px;
+	height: 44px;
 	border: 1px solid rgba(255, 255, 255, 0.12);
 	border-radius: 8px;
 	background: #17191d;
 	color: #ff6847;
 	font-size: 18px;
 	font-weight: 900;
+	padding: 6px;
 }
 
-.tap-brand h1,
+.tap-brand__mark img {
+	display: block;
+	width: 100%;
+	height: 100%;
+	object-fit: contain;
+	pointer-events: none;
+}
+
+.tap-brand__copy,
 .tap-brand p {
 	margin: 0;
 }
 
-.tap-brand h1 {
+.tap-brand__copy {
+	display: grid;
+	gap: 5px;
+	min-width: 0;
+}
+
+.tap-brand__logo {
 	display: block;
-	background-color: #363636;
-	font-size: 18px;
-	line-height: 1.1;
-	font-weight: 850;
+	width: min(236px, 48vw);
+	height: 30px;
+	object-fit: contain;
+	object-position: left center;
+	pointer-events: none;
 }
 
 .tap-brand p {
-	margin-top: 4px;
 	color: #8f96a3;
 	font-size: 12px;
 	font-weight: 650;
@@ -1414,7 +1440,7 @@
 	background: #24262a;
 	color: inherit;
 	font: inherit;
-	cursor: zoom-in;
+	cursor: grab;
 }
 
 .tap-image-frame:hover {
@@ -1425,6 +1451,18 @@
 	border-color: rgba(255, 104, 71, 0.78);
 	box-shadow: inset 0 0 0 2px rgba(255, 104, 71, 0.2);
 	cursor: crosshair;
+}
+
+.tap-node__workflow-preview {
+	border-color: rgba(120, 220, 255, 0.3) !important;
+	background:
+		linear-gradient(135deg, rgba(86, 189, 255, 0.18), rgba(255, 255, 255, 0.04)), #25282d !important;
+}
+
+.tap-node__workflow-preview:hover {
+	border-color: rgba(120, 220, 255, 0.56) !important;
+	background:
+		linear-gradient(135deg, rgba(86, 189, 255, 0.26), rgba(255, 255, 255, 0.06)), #2b3036 !important;
 }
 
 .tap-image-frame img {
@@ -1640,36 +1678,65 @@
 .tap-node__workflow-presets {
 	position: absolute;
 	z-index: 8;
-	top: calc(100% + 10px);
-	left: 0;
+	top: 56px;
+	left: calc(100% + 16px);
 	display: grid;
 	gap: 8px;
-	width: min(420px, 100%);
-	padding: 8px;
+	width: 360px;
+	max-height: min(520px, calc(100vh - 150px));
+	overflow: auto;
+	padding: 10px;
 	border: 1px solid rgba(255, 255, 255, 0.12);
 	border-radius: 8px;
-	background: rgba(20, 21, 24, 0.96);
-	box-shadow: 0 24px 72px rgba(0, 0, 0, 0.48);
-	backdrop-filter: blur(16px);
+	background: linear-gradient(180deg, rgba(58, 61, 68, 0.96), rgba(23, 24, 28, 0.96)), #202227;
+	box-shadow: 0 26px 80px rgba(0, 0, 0, 0.56);
+	backdrop-filter: blur(18px);
+}
+
+.tap-node__workflow-presets::before {
+	content: '工作流';
+	display: block;
+	padding: 2px 4px 4px;
+	color: #aeb6c4;
+	font-size: 11px;
+	font-weight: 900;
 }
 
 .tap-node__workflow-presets button {
 	display: grid;
-	gap: 4px;
+	grid-template-columns: 36px minmax(0, 1fr);
+	grid-template-rows: auto auto;
+	column-gap: 10px;
+	row-gap: 3px;
 	width: 100%;
 	border: 1px solid rgba(255, 255, 255, 0.1);
 	border-radius: 7px;
-	background: #282a2f;
+	background: rgba(45, 48, 55, 0.96);
 	color: #f5f7fb;
 	font: inherit;
-	padding: 9px 10px;
+	padding: 11px 12px;
 	text-align: left;
 	cursor: pointer;
 }
 
+.tap-node__workflow-presets button::before {
+	content: '+';
+	grid-row: 1 / 3;
+	display: grid;
+	place-items: center;
+	width: 36px;
+	height: 36px;
+	border-radius: 8px;
+	background: #1c1f25;
+	color: #ff6847;
+	font-size: 22px;
+	font-weight: 900;
+	line-height: 1;
+}
+
 .tap-node__workflow-presets button:hover {
 	border-color: rgba(255, 104, 71, 0.35);
-	background: #332b2a;
+	background: rgba(57, 59, 66, 0.98);
 }
 
 .tap-node__workflow-presets .tap-node__workflow-motion {
@@ -1693,14 +1760,17 @@
 }
 
 .tap-node__workflow-presets strong {
-	font-size: 12px;
+	min-width: 0;
+	font-size: 15px;
 	font-weight: 900;
+	line-height: 1.2;
 }
 
 .tap-node__workflow-presets span {
+	min-width: 0;
 	overflow: hidden;
 	color: #a8afbc;
-	font-size: 11px;
+	font-size: 12px;
 	font-weight: 750;
 	line-height: 1.35;
 	text-overflow: ellipsis;
@@ -1924,7 +1994,7 @@
 	cursor: pointer;
 }
 
-.tap-video-ratio-group button[data-selected="true"] {
+.tap-video-ratio-group button[data-selected='true'] {
 	border-color: rgba(255, 104, 71, 0.75);
 	background: #3b211d;
 	color: #ffd3c8;
@@ -2424,6 +2494,14 @@
 
 	.tap-node__connector {
 		right: -38px;
+	}
+
+	.tap-node__workflow-presets {
+		top: calc(100% + 10px);
+		right: 0;
+		left: 0;
+		width: min(360px, 100%);
+		max-height: 360px;
 	}
 
 	.tap-generate-menu,
