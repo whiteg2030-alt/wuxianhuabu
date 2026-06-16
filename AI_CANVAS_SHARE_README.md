@@ -1,21 +1,26 @@
-# AI Canvas sharing notes
+# AI Canvas 分享说明
 
-## Full project
+这份文件保留给已经习惯旧入口的人。新的完整说明请看：
 
-1. On the first run, double-click `setup-local-env.cmd`.
-2. Then double-click `open-ai-canvas.cmd`.
-3. Open `http://localhost:5420/ai-canvas-agent/full` if the browser does not open automatically.
-4. Click the top API status button in the canvas and enter your own API key.
-   - Image generation / Agent: enter the OpenAI-compatible image gateway key.
-   - Video generation: enter the Volcengine Ark API key for Doubao Seedance 2.0.
+- [README.md](./README.md)：项目介绍和常用入口
+- [QUICK_START.md](./QUICK_START.md)：别人拿到项目后的最快启动方式
+- [docs/SHARING.md](./docs/SHARING.md)：分享前隐私检查和便携包说明
 
-Do not commit or share `apps/examples/.env.local` unless you intentionally want to share that local API key.
+## 完整源码分享
 
-## Portable share package
+1. 下载或 clone 仓库。
+2. 第一次运行双击 `setup-local-env.cmd`。
+3. 之后双击 `open-ai-canvas.cmd`。
+4. 打开 `http://localhost:5420/ai-canvas-agent/full`。
+5. 在画布顶部接口配置里填写自己的 API Key。
 
-Use `ai-canvas-share.zip` when sending the app to someone else. It is much smaller than the full repository and includes a local Node runtime.
+不要提交或分享 `apps/examples/.env.local`。
 
-1. Unzip `ai-canvas-share.zip`.
-2. Double-click `ai-canvas-share/start.cmd`.
-3. Keep the "AI Canvas Server" window open while using the app.
-4. Do not share the generated `data/` folder after entering private API keys.
+## 便携包分享
+
+如果已经生成 `ai-canvas-share.zip`：
+
+1. 解压 `ai-canvas-share.zip`。
+2. 双击 `ai-canvas-share/start.cmd`。
+3. 使用时保持本地服务窗口打开。
+4. 输入过私有 API Key 后，不要再把生成的 `data/` 目录分享给别人。
